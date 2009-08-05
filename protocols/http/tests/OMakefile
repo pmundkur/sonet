@@ -1,0 +1,14 @@
+HTTP_LIB_DIR = ..
+
+OCAMLFLAGS += -I $(HTTP_LIB_DIR)
+
+OCAML_LIBS += $(HTTP_LIB_DIR)/http
+
+TEST_PARSER_PROG = test_http
+TEST_PARSER = $(OCamlProgram $(TEST_PARSER_PROG), test_http)
+
+.DEFAULT: $(TEST_PARSER)
+
+.PHONY: clean
+clean:
+	$(CLEAN) $(TEST_PARSER)

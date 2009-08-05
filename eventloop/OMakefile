@@ -1,0 +1,26 @@
+.PHONY: clean
+
+OCAMLPACKS[] =
+	unix
+
+OCAMLFLAGS += -g -dtypes -w A
+
+# OCAMLCFLAGS   +=
+# OCAMLOPTFLAGS +=
+# OCAML_LINK_FLAGS +=
+# OCAML_BYTE_LINK_FLAGS +=
+# OCAML_NATIVE_LINK_FLAGS +=
+
+FILES[] =
+	eventloop
+	net_events
+	unix_poller
+	async_conn
+	connection_table
+
+LIB = eventloop
+
+.DEFAULT: $(OCamlLibrary $(LIB), $(FILES))
+
+clean:
+	$(CLEAN)

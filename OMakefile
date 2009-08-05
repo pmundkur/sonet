@@ -1,0 +1,5 @@
+BASE = $(dir .)
+
+CLEAN = rm -f *.annot *.cmi *.cmo *.cmxa *.cmx *.o *.a *.opt
+
+.SUBDIRS: eventloop protocols

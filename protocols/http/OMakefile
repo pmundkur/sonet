@@ -1,0 +1,15 @@
+FILES[] =
+	httputils
+	uri
+	http
+
+LIB = http
+HTTP_LIB = $(OCamlLibrary $(LIB), $(FILES))
+
+.DEFAULT: $(HTTP_LIB)
+
+.PHONY: clean
+clean:
+	$(CLEAN) $(HTTP_LIB)
+
+#.SUBDIRS: tests
