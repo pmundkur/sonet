@@ -113,7 +113,7 @@ and conn_state = {
 and t = {
   mutable conns : conn_state ConnMap.t;
   mutable timers : (unit -> unit) Timers.t;
-  poller : Unix_poller.t;
+  poller : Net_events.poller;
   (* Unix.gettimeofday() at the time the loop iteration started *)
   mutable current_time : float;
   (* events currently being dispatched *)
@@ -142,15 +142,15 @@ let register_conn t fd ?(enable_send=false) ?(enable_recv=true) callbacks =
   in
     t.conns <- ConnMap.add fd conn_state t.conns;
     Unix.set_nonblock fd;
-    Unix_poller.add t.poller fd;
+    t.poller.Net_events.add fd;
     if conn_state.recv_enabled then
-      Unix_poller.enable_recv t.poller fd;
+      t.poller.Net_events.enable_recv fd;
     if conn_state.send_enabled then
-      Unix_poller.enable_send t.poller fd;
+      t.poller.Net_events.enable_send fd;
     fd
 
 let remove_conn t handle =
-  Unix_poller.remove t.poller handle;
+  t.poller.Net_events.remove handle;
   Net_events.remove_events handle ~start_indx:t.cur_ev_indx t.cur_events;
   t.conns <- ConnMap.remove handle t.conns
 
@@ -165,15 +165,15 @@ let connect t handle addr =
       conn_state.callbacks.connect_callback t handle
     with
       | Unix.Unix_error (Unix.EINPROGRESS, _, _) ->
-          Unix_poller.enable_recv t.poller handle;
-          Unix_poller.enable_send t.poller handle;
+          t.poller.Net_events.enable_recv handle;
+          t.poller.Net_events.enable_send handle;
       | Unix.Unix_error (ec, f, s) ->
           conn_state.callbacks.error_callback t handle (ec, f, s)
 
 let listen t handle =
   let conn_state = ConnMap.find handle t.conns in
     Unix.listen handle 5;
-    Unix_poller.enable_recv t.poller handle;
+    t.poller.Net_events.enable_recv handle;
     conn_state.recv_enabled <- true;
     conn_state.status <- Listening
 
@@ -181,25 +181,25 @@ let enable_send t handle =
   let conn_state = ConnMap.find handle t.conns in
     conn_state.send_enabled <- true;
     if conn_state.status = Connected then
-      Unix_poller.enable_send t.poller handle
+      t.poller.Net_events.enable_send handle
 
 let disable_send t handle =
   let conn_state = ConnMap.find handle t.conns in
     conn_state.send_enabled <- false;
     if conn_state.status = Connected then
-      Unix_poller.disable_send t.poller handle
+      t.poller.Net_events.disable_send handle
 
 let enable_recv t handle =
   let conn_state = ConnMap.find handle t.conns in
     conn_state.recv_enabled <- true;
     if conn_state.status = Connected then
-      Unix_poller.enable_recv t.poller handle
+      t.poller.Net_events.enable_recv handle
 
 let disable_recv t handle =
   let conn_state = ConnMap.find handle t.conns in
     conn_state.recv_enabled <- false;
     if conn_state.status = Connected then
-      Unix_poller.disable_recv t.poller handle
+      t.poller.Net_events.disable_recv handle
 
 let set_callbacks t handle callbacks =
   let conn_state = ConnMap.find handle t.conns in
@@ -232,9 +232,9 @@ let dispatch_read t fd cs =
            | None ->
                cs.status <- Connected;
                if not cs.recv_enabled then
-                 Unix_poller.disable_recv t.poller fd;
+                 t.poller.Net_events.disable_recv fd;
                if not cs.send_enabled then
-                 Unix_poller.disable_send t.poller fd;
+                 t.poller.Net_events.disable_send fd;
                cs.callbacks.connect_callback t fd
            | Some err ->
                cs.callbacks.error_callback t fd (err, "connect", "")
@@ -254,7 +254,7 @@ let dispatch_read t fd cs =
     | Connected ->
         if cs.recv_enabled
         then cs.callbacks.recv_ready_callback t fd fd
-        else Unix_poller.disable_recv t.poller fd
+        else t.poller.Net_events.disable_recv fd
 
 let dispatch_write t fd cs =
   match cs.status with
@@ -263,9 +263,9 @@ let dispatch_write t fd cs =
            | None ->
                cs.status <- Connected;
                if not cs.recv_enabled then
-                 Unix_poller.disable_recv t.poller fd;
+                 t.poller.Net_events.disable_recv fd;
                if not cs.send_enabled then
-                 Unix_poller.disable_send t.poller fd;
+                 t.poller.Net_events.disable_send fd;
                cs.callbacks.connect_callback t fd
            | Some err ->
                cs.callbacks.error_callback t fd (err, "connect", "")
@@ -275,11 +275,11 @@ let dispatch_write t fd cs =
            are not set for writing.  But, to avoid a busy
            select loop in case this socket keeps firing for
            writes, we disable the write watch.  *)
-        Unix_poller.disable_send t.poller fd
+        t.poller.Net_events.disable_send fd
     | Connected ->
         if cs.send_enabled
         then cs.callbacks.send_ready_callback t fd fd
-        else Unix_poller.disable_send t.poller fd
+        else t.poller.Net_events.disable_send fd
 
 let dispatch_timers t =
   let break = ref false in
@@ -308,7 +308,7 @@ let dispatch t interval =
         if interval < 0.0 then 0.0 else interval
   in
   let opt_events =
-    try Some (Unix_poller.get_events t.poller interval)
+    try Some (t.poller.Net_events.get_events interval)
     with Unix.Unix_error (Unix.EINTR, _, _) -> None in
   let process_event idx ev =
     t.cur_ev_indx <- idx;
@@ -323,16 +323,16 @@ let dispatch t interval =
                previous callback *)
             ()
         | Some cs, Net_events.Readable ->
-            if Unix_poller.is_recv_enabled t.poller fd
+            if t.poller.Net_events.is_recv_enabled fd
             then dispatch_read t fd cs
         | Some cs, Net_events.Writeable ->
-            if Unix_poller.is_send_enabled t.poller fd
+            if t.poller.Net_events.is_send_enabled fd
             then dispatch_write t fd cs
         | Some cs, Net_events.PendingError ->
             (* dispatch any enabled callback *)
-            if Unix_poller.is_recv_enabled t.poller fd
+            if t.poller.Net_events.is_recv_enabled fd
             then dispatch_read t fd cs
-            else if Unix_poller.is_send_enabled t.poller fd
+            else if t.poller.Net_events.is_send_enabled fd
             then dispatch_write t fd cs
         | Some cs, Net_events.Error (ec, f, s) ->
             cs.callbacks.error_callback t fd (ec, f, s)

@@ -21,7 +21,23 @@ type t = {
   mutable errors  : Unix.file_descr list;
 }
 
-let create () = {
+type ops = {
+  add : t -> Unix.file_descr -> unit;
+  remove : t -> Unix.file_descr -> unit;
+
+  enable_recv : t -> Unix.file_descr -> unit;
+  disable_recv : t -> Unix.file_descr -> unit;
+
+  enable_send : t -> Unix.file_descr -> unit;
+  disable_send : t -> Unix.file_descr -> unit;
+
+  is_recv_enabled : t -> Unix.file_descr -> bool;
+  is_send_enabled : t -> Unix.file_descr -> bool;
+
+  get_events : t -> float -> Net_events.event array;
+}
+
+let create_t () = {
   readers = [];
   writers = [];
   errors  = [];
@@ -75,3 +91,16 @@ let get_events t timeout =
                  }) errors)
   in
     Array.of_list events
+
+let create () =
+  let t = create_t () in {
+      Net_events.add    = add t;
+      Net_events.remove = remove t;
+      Net_events.enable_recv  = enable_recv t;
+      Net_events.disable_recv = disable_recv t;
+      Net_events.enable_send  = enable_send t;
+      Net_events.disable_send = disable_send t;
+      Net_events.is_recv_enabled = is_recv_enabled t;
+      Net_events.is_send_enabled = is_send_enabled t;
+      Net_events.get_events = get_events t;
+    }

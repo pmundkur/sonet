@@ -10,24 +10,21 @@ type event = {
   event_fd : Unix.file_descr;
 }
 
-module type Event_poller = sig
-  type t
+type poller = {
+  add : Unix.file_descr -> unit;
+  remove : Unix.file_descr -> unit;
 
-  val create : unit -> t
+  enable_recv : Unix.file_descr -> unit;
+  disable_recv : Unix.file_descr -> unit;
 
-  val add : t -> Unix.file_descr -> unit
-  val remove : t -> Unix.file_descr -> unit
+  enable_send : Unix.file_descr -> unit;
+  disable_send : Unix.file_descr -> unit;
 
-  val enable_recv : t -> Unix.file_descr -> unit
-  val disable_recv : t -> Unix.file_descr -> unit
-  val enable_send : t -> Unix.file_descr -> unit
-  val disable_send : t -> Unix.file_descr -> unit
+  is_recv_enabled : Unix.file_descr -> bool;
+  is_send_enabled : Unix.file_descr -> bool;
 
-  val is_recv_enabled : t -> Unix.file_descr -> bool
-  val is_send_enabled : t -> Unix.file_descr -> bool
-
-  val get_events : t -> float -> event array
-end
+  get_events : float -> event array;
+}
 
 let remove_events fd ?(start_indx=0) events =
   for indx = start_indx to (Array.length events) - 1 do
