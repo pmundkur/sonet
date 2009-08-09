@@ -4,6 +4,8 @@ OCAMLFLAGS += -I $(HTTP_LIB_DIR)
 
 OCAML_LIBS += $(HTTP_LIB_DIR)/http
 
+OCAML_OTHER_LIBS += str
+
 TEST_PARSER_PROG = test_http
 TEST_PARSER = $(OCamlProgram $(TEST_PARSER_PROG), test_http)
 

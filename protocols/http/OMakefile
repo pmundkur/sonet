@@ -12,4 +12,4 @@ HTTP_LIB = $(OCamlLibrary $(LIB), $(FILES))
 clean:
 	$(CLEAN) $(HTTP_LIB)
 
-#.SUBDIRS: tests
+.SUBDIRS: tests
