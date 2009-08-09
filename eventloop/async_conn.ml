@@ -41,7 +41,7 @@ and callbacks = {
 let compare t1 t2 = compare t1.ev_handle t2.ev_handle
 let hash t = Eventloop.handle_hash t.ev_handle
 
-module Conns = Connection_table.Make(struct type conn = t end)
+module Conns = Conn_map.Make(struct type conn = t end)
 
 let accept_callback _el _h _fd _addr =
   failwith "Async_conn.accept_callback: invalid use"

@@ -5,22 +5,27 @@ OCAMLPACKS[] =
 
 OCAMLFLAGS += -g -dtypes -w A
 
-# OCAMLCFLAGS   +=
-# OCAMLOPTFLAGS +=
-# OCAML_LINK_FLAGS +=
-# OCAML_BYTE_LINK_FLAGS +=
-# OCAML_NATIVE_LINK_FLAGS +=
-
-FILES[] =
+O_FILES[] =
 	eventloop
 	net_events
-	unix_poller
 	async_conn
-	connection_table
+	conn_map
+	unix_poller
+	epoll_poller
+
+C_FILES[] =
+	epoll_stubs
 
 LIB = eventloop
 
-.DEFAULT: $(OCamlLibrary $(LIB), $(FILES))
+epoll_poller.$(CMO) epoll_poller.o : epoll_stubs.o
+
+epoll_stubs.o: epoll_stubs.c
+	$(OCAMLC) -c -o $@ $^
+
+OCAML_LIB_FLAGS += $(absname $(addsuffix .o, $(C_FILES)))
+
+.DEFAULT: $(OCamlLibrary $(LIB), $(O_FILES))
 
 clean:
 	$(CLEAN)

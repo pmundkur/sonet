@@ -13,31 +13,31 @@
  * GNU Lesser General Public License for more details.
  *)
 
-module type ConnectionInfo =
+module type CONN_INFO =
 sig
   type conn
 end
 
-module Make (ConnInfo : ConnectionInfo) =
+module Make (ConnInfo : CONN_INFO) =
 struct
 
-  module ConnectionMap = Map.Make (struct type t = Eventloop.handle
-                                          let compare = Eventloop.handle_compare
-                                   end)
+  module ConnMap = Map.Make (struct type t = Eventloop.handle
+                                    let compare = Eventloop.handle_compare
+                             end)
 
-  let conns = ref (ConnectionMap.empty : ConnInfo.conn ConnectionMap.t)
+  let conns = ref (ConnMap.empty : ConnInfo.conn ConnMap.t)
 
   (* Connection handling utilities *)
 
   let add_conn h conn =
-    conns := ConnectionMap.add h conn !conns
+    conns := ConnMap.add h conn !conns
 
   let get_conn h =
-    ConnectionMap.find h !conns
+    ConnMap.find h !conns
 
   let has_conn h =
-    ConnectionMap.mem h !conns
+    ConnMap.mem h !conns
 
   let remove_conn h =
-    conns := ConnectionMap.remove h !conns
+    conns := ConnMap.remove h !conns
 end
