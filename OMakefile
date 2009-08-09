@@ -1,5 +1,21 @@
+if $(NATIVE_ENABLED)
+	CMO = cmx
+	CMA = cmxa
+	export
+else
+	CMO = cmo
+	CMA = cma
+	export
+
 BASE = $(dir .)
 
 CLEAN = rm -f *.annot *.cmi *.cmo *.cmxa *.cmx *.o *.a *.opt
 
-.SUBDIRS: eventloop protocols
+HTTP_LIB_DIR = $(dir protocols/http)
+JSONRPC_LIB_DIR = $(dir protocols/jsonrpc)
+
+.SUBDIRS: eventloop protocols/http protocols/jsonrpc
+.SUBDIRS: codegen/json_convert
+	include OMakefile
+	export
+.SUBDIRS: codegen/jsonrpc_idl

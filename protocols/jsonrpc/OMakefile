@@ -1,0 +1,16 @@
+FILES[] =
+	json
+	json_parse
+	json_conv
+	jsonrpc
+
+LIB = jsonrpc
+JSONRPC_LIB = $(OCamlLibrary $(LIB), $(FILES))
+
+.DEFAULT: $(JSONRPC_LIB)
+
+.PHONY: clean
+clean:
+	$(CLEAN) $(JSONRPC_LIB)
+
+.SUBDIRS: tests

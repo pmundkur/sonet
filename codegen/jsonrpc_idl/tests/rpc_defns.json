@@ -1,0 +1,164 @@
+{ "use_modules": ["rpc_types", "rpc_types_json_conv"]}
+
+{ "server_name": "server",
+  "server_doc": "",
+  "server_message_filter": "server_message_filter",
+  "server_error_handler": "server_error_handler"
+}
+
+{ "rpc_type": "rpc",
+  "rpc_server": "server",
+  "rpc_doc": "documentation",
+  "rpc_version": "string",
+
+  "rpc_request": { "request_name": "request0",
+                   "request_doc": "documentation",
+                   "request_handler": "request0_handler",
+                   "request_params": []
+                 },
+
+  "rpc_response": { "response_doc": "documentation",
+                    "response_handler": "response0_handler",
+                    "response_value": { "param_name": "resp1",
+                                        "param_doc": "documentation",
+                                        "param_type": "resp1_type"
+                                      }
+                  },
+
+  "rpc_deprecated": "some notes",
+  "rpc_label_arguments": false
+}
+
+{ "rpc_type": "rpc",
+  "rpc_server": "server",
+  "rpc_doc": "documentation",
+  "rpc_version": "string",
+
+  "rpc_request": { "request_name": "request1",
+                   "request_doc": "documentation",
+                   "request_handler": "request1_handler",
+                   "request_params": [ { "param_name": "request1_arg1",
+                                         "param_doc": "documentation",
+                                         "param_type": "arg1_type"
+                                       }
+                                     ]
+                 },
+
+  "rpc_response": { "response_doc": "documentation",
+                    "response_handler": "response1_handler",
+                    "response_value": { "param_name": "resp1",
+                                        "param_doc": "documentation",
+                                        "param_type": "resp1_type"
+                                      }
+                  },
+
+  "rpc_deprecated": "some notes",
+  "rpc_label_arguments": false
+}
+
+{ "rpc_type": "rpc",
+  "rpc_server": "server",
+  "rpc_doc": "documentation",
+  "rpc_version": "string",
+
+  "rpc_request": { "request_name": "request2",
+                   "request_doc": "documentation",
+                   "request_handler": "request2_handler",
+                   "request_params": [ { "param_name": "arg1",
+                                         "param_doc": "documentation",
+                                         "param_type": "arg1_type"
+                                       },
+                                       { "param_name": "arg2",
+                                         "param_doc": "documentation",
+                                         "param_type": "arg2_type"
+                                       },
+                                       { "param_name": "arg3",
+                                         "param_doc": "documentation",
+                                         "param_type": "arg3_type"
+                                       }
+                                     ]
+                 },
+
+  "rpc_response": { "response_doc": "documentation",
+                    "response_handler": "client_function",
+                    "response_value": { "param_name": "resp2",
+                                        "param_doc": "documentation",
+                                        "param_type": "resp2_type"
+                                      }
+                  },
+
+  "rpc_label_arguments": true
+}
+
+{ "rpc_type": "notification",
+  "rpc_server": "server",
+  "rpc_doc": "documentation",
+  "rpc_version": "string",
+
+  "rpc_request": { "request_name": "notification1",
+                   "request_doc": "documentation",
+                   "request_handler": "not1_handler",
+                   "request_params": [ { "param_name": "arg1",
+                                         "param_doc": "documentation",
+                                         "param_type": "arg1_type"
+                                       },
+                                       { "param_name": "arg2",
+                                         "param_doc": "documentation",
+                                         "param_type": "arg2_type"
+                                       },
+                                       { "param_name": "arg3",
+                                         "param_doc": "documentation",
+                                         "param_type": "arg3_type"
+                                       }
+                                     ]
+                 }
+}
+
+{ "server_name": "server1",
+  "server_doc": "",
+  "server_error_handler": "server1_error_handler"
+}
+
+{ "rpc_type": "rpc",
+  "rpc_server": "server1",
+  "rpc_doc": "documentation",
+  "rpc_version": "string",
+
+  "rpc_request": { "request_name": "request2",
+                   "request_doc": "documentation",
+                   "request_handler": "request2_handler",
+                   "request_params": [ { "param_name": "arg1",
+                                         "param_doc": "documentation",
+                                         "param_type": "arg1_type"
+                                       },
+                                       { "param_name": "arg2",
+                                         "param_doc": "documentation",
+                                         "param_type": "arg2_type"
+                                       },
+                                       { "param_name": "arg3",
+                                         "param_doc": "documentation",
+                                         "param_type": "arg3_type"
+                                       }
+                                     ]
+                 },
+
+  "rpc_response": { "response_doc": "documentation",
+                    "response_handler": "client_function",
+                    "response_value": { "param_name": "resp2",
+                                        "param_doc": "documentation",
+                                        "param_type": "resp2_type"
+                                      }
+                  },
+
+  "rpc_label_arguments": true
+}
+
+{ "endpoint_name": "one",
+  "endpoint_servers": [ "server" ],
+  "endpoint_clients": [ "server1" ]
+}
+
+{ "endpoint_name": "two",
+  "endpoint_servers": [ "server1" ],
+  "endpoint_clients": [ "server" ]
+}

@@ -1,0 +1,21 @@
+OCAMLFLAGS += -I $(JSONRPC_LIB_DIR)
+
+test_types_json_conv.ml: test_types.ml $(JSON_CONV)
+	../$(JSON_CONV_PROG) -i $< -o $@
+
+TESTER_FILES[] =
+	test_types
+	test_types_json_conv
+	test_json_conv
+
+OCAML_LIBS[] +=
+	 $(JSONRPC_LIB_DIR)/jsonrpc
+
+TESTER_PROG = test_json_conv
+TESTER = $(OCamlProgram $(TESTER_PROG), $(TESTER_FILES))
+
+.DEFAULT: $(TESTER)
+
+.PHONY: clean
+clean:
+	$(CLEAN) $(TESTER) test_types_json_conv.ml

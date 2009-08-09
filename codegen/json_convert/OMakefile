@@ -1,0 +1,23 @@
+GEN_FILES = parser.mli parser.ml lexer.ml
+OCamlGeneratedFiles($(GEN_FILES))
+
+OCAML_OTHER_LIBS[] += unix
+
+CONV_FILES[] =
+	lexer
+	parser
+	syntax
+	codegen
+	gen_json_conv
+
+JSON_CONV_PROG = gen_json_conv
+JSON_CONV = $(OCamlProgram $(JSON_CONV_PROG), $(CONV_FILES))
+
+.DEFAULT: $(JSON_CONV)
+
+.PHONY: clean
+clean:
+	$(CLEAN) $(JSON_CONV) $(GEN_FILES)
+
+.SUBDIRS: tests
+

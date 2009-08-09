@@ -1,0 +1,25 @@
+syntax_json_conv.ml: syntax.ml $(JSON_CONV)
+	../json_convert/$(JSON_CONV_PROG) -i $< -o $@
+
+OCAMLFLAGS += -I $(JSONRPC_LIB_DIR)
+
+GEN_RPC_FILES[] =
+	syntax
+	syntax_json_conv
+	rpc_decl
+	codegen
+	gen_rpc
+
+OCAML_LIBS += $(JSONRPC_LIB_DIR)/jsonrpc
+
+GEN_RPC_PROG = gen_rpc
+GEN_RPC = $(OCamlProgram $(GEN_RPC_PROG), $(GEN_RPC_FILES))
+
+.DEFAULT: $(GEN_RPC)
+
+
+.PHONY: clean
+clean:
+	$(CLEAN) $(GEN_RPC) syntax_json_conv.ml
+
+.SUBDIRS: tests

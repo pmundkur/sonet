@@ -1,0 +1,26 @@
+rpc_types_json_conv.ml: rpc_types.ml $(JSON_CONV)
+	../../json_convert/$(JSON_CONV_PROG) -i $< -o $@
+
+rpc_one.ml rpc_two.ml: rpc_defns.json $(GEN_RPC)
+	../$(GEN_RPC_PROG)  -o 'one:rpc_one.ml' -o 'two:rpc_two.ml' $<
+
+OCAMLFLAGS += -I $(JSONRPC_LIB_DIR)
+
+RPC_TEST_FILES[] =
+	rpc_types
+	rpc_types_json_conv
+	rpc_one
+	rpc_two
+	test_rpc
+
+
+OCAML_LIBS = $(JSONRPC_LIB_DIR)/jsonrpc
+
+RPC_TEST_PROG = test_rpc
+RPC_TEST = $(OCamlProgram $(RPC_TEST_PROG), $(RPC_TEST_FILES))
+
+.DEFAULT: $(RPC_TEST)
+
+.PHONY: clean
+clean:
+	$(CLEAN) $(RPC_TEST) rpc_types_json_conv.ml rpc_one.ml rpc_two.ml
