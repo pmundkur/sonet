@@ -25,7 +25,9 @@ epoll_stubs.o: epoll_stubs.c
 
 OCAML_LIB_FLAGS += $(absname $(addsuffix .o, $(C_FILES)))
 
-.DEFAULT: $(OCamlLibrary $(LIB), $(O_FILES))
+EVENTLOOP_LIB = $(OCamlLibrary $(LIB), $(O_FILES))
+
+.DEFAULT: $(EVENTLOOP_LIB)
 
 clean:
 	$(CLEAN)

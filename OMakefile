@@ -11,11 +11,18 @@ BASE = $(dir .)
 
 CLEAN = rm -f *.annot *.cmi *.cmo *.cmxa *.cmx *.o *.a *.opt
 
+EVENTLOOP_DIR = $(dir eventloop)
 HTTP_LIB_DIR = $(dir protocols/http)
 JSONRPC_LIB_DIR = $(dir protocols/jsonrpc)
 
-.SUBDIRS: eventloop protocols/http protocols/jsonrpc
+.SUBDIRS: eventloop
+	include OMakefile
+	export EVENTLOOP_LIB
+
+.SUBDIRS: protocols/http protocols/jsonrpc
+
 .SUBDIRS: codegen/json_convert
 	include OMakefile
-	export
+	export JSON_CONV JSON_CONV_PROG
+
 .SUBDIRS: codegen/jsonrpc_idl
