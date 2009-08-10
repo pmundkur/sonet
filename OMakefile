@@ -19,7 +19,7 @@ JSONRPC_LIB_DIR = $(dir protocols/jsonrpc)
 	include OMakefile
 	export EVENTLOOP_LIB
 
-.SUBDIRS: protocols/http protocols/jsonrpc
+.SUBDIRS: protocols/http protocols/jsonrpc protocols/dbus
 
 .SUBDIRS: codegen/json_convert
 	include OMakefile

@@ -1,0 +1,28 @@
+OCAMLFLAGS += -dtypes
+OCAMLINCLUDES += $(EVENTLOOP_DIR)
+
+DBUS_FILES[] =
+	dbus_type
+	dbus_value
+	dbus_type_parse
+	dbus_type_marshal
+	dbus_message
+	dbus_message_parse
+	dbus_message_marshal
+	dbus_conv
+	dbus_auth
+	protocol
+	utils
+	dbus_connection
+
+LIB = dbus
+DBUS_LIB = $(OCamlLibrary $(LIB), $(DBUS_FILES))
+$(DBUS_LIB): $(EVENTLOOP_LIB)
+
+.DEFAULT: $(DBUS_LIB)
+
+.PHONY: clean
+clean:
+	$(CLEAN) $(DBUS_LIB)
+
+.SUBDIRS: test
