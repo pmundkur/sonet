@@ -131,10 +131,14 @@ let init () =
 
 let create () =
   init ();
+  let poller =
+	try Epoll_poller.create ()
+	with _ -> Unix_poller.create ()
+  in
   {
     conns = ConnMap.empty;
     timers = Timers.create ();
-    poller = Unix_poller.create ();
+    poller = poller;
     current_time = 0.0;
     cur_events = [||];
     cur_ev_indx = 0;
