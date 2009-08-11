@@ -28,6 +28,8 @@
 #include <caml/fail.h>
 #include <caml/signals.h>
 
+#include "eventloop.h"
+
 #ifndef MAX_EPOLL_FDS
 #define MAX_EPOLL_FDS 2048
 #endif
@@ -35,23 +37,6 @@
 #ifndef MAX_EPOLL_WAIT_EVENTS
 #define MAX_EPOLL_WAIT_EVENTS 32
 #endif
-
-/*  IMPORTANT NOTE: Keep these #defines in sync with the definitions in
- *  net_events.mli.
- *
- *  Only the first three constructor defines are used in this file.
- */
-
-#define CONSTR_EV_READABLE          0
-#define CONSTR_EV_WRITEABLE         1
-#define CONSTR_EV_PENDING_ERROR     2
-#define CONSTR_EV_ERROR             3
-#define CONSTR_EV_REMOVED           4
-
-#define RECORD_EVENT_TYPE_OFS       0
-#define RECORD_EVENT_FD_OFS         1
-
-#define UNIX_EXCEPTION_NAME         "onet.unix_error_exception"
 
 struct epoll_state {
     int epoll_fd;
