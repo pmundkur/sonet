@@ -195,6 +195,7 @@ let process_server_cmd ctxt sender s consumed =
 (* Protocol initialization and parsing *)
 
 let init_client_context mech_type sender =
+  sender "\x00";
   let mech_str, mech =
     match mech_type with
       | External -> "EXTERNAL", (new external_mech : mechanism)

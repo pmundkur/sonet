@@ -75,7 +75,6 @@ let connect_callback aconn =
   let sender = C.send aconn in
   let auth_context, auth_state = A.init_client_context A.External sender in
     assert (conn.state = Connecting);
-    sender "\x00";
     match auth_state with
       | A.Auth_in_progress ->
           conn.state <- Authenticating auth_context
@@ -117,6 +116,7 @@ let recv_callback aconn s ofs len =
                | A.Auth_succeeded (addr, consumed) ->
                    conn.server_address <- addr;
                    conn.state <- Connected init_conn_state;
+                   conn.callbacks.authenticated_callback conn;
                    receiver s (ofs + consumed) (len - consumed)
             )
       | Connected cs ->
