@@ -19,7 +19,7 @@ type t
 
 external create_t : int -> t = "stub_epoll_create"
 
-external add : t -> Unix.file_descr -> unit = "stub_epoll_addr"
+external add : t -> Unix.file_descr -> unit = "stub_epoll_add"
 
 external remove : t -> Unix.file_descr -> unit = "stub_epoll_remove"
 
@@ -36,6 +36,9 @@ external is_recv_enabled : t -> Unix.file_descr -> bool = "stub_epoll_is_recv_en
 external is_send_enabled : t -> Unix.file_descr -> bool = "stub_epoll_is_send_enabled"
 
 external get_events : t -> float -> Net_events.event array = "stub_epoll_get_events"
+
+let init () =
+  Callback.register_exception "onet.unix_error_exception" (Unix.Unix_error (Unix.EEXIST, "string", "string"))
 
 let create ?(size=1024) () =
   let t = create_t size in {

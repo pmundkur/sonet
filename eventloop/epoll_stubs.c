@@ -51,6 +51,8 @@
 #define RECORD_EVENT_TYPE_OFS       0
 #define RECORD_EVENT_FD_OFS         1
 
+#define UNIX_EXCEPTION_NAME         "onet.unix_error_exception"
+
 struct epoll_state {
     int epoll_fd;
     int watch_array_size;
@@ -101,7 +103,7 @@ void raise_unix_error(int errnum, char *fn_name, char *fn_param) {
 
     static value *caml_unix_exc_constr = NULL;
     if (NULL == caml_unix_exc_constr)
-        caml_unix_exc_constr = caml_named_value("onet.unix_error_exception");
+        caml_unix_exc_constr = caml_named_value(UNIX_EXCEPTION_NAME);
     if (NULL == caml_unix_exc_constr)
         invalid_argument("Exception Unix.Unix_error not initialized, please link unix.cma");
 
@@ -171,6 +173,7 @@ CAMLprim value stub_epoll_add(value es, value fd) {
     struct epoll_state *c_es;
     struct epoll_event event;
 
+    memset(&event, 0, sizeof(event));
     c_es = Epoll_state_val(es);
 
     if (Int_val(fd) > c_es->watch_array_size)
@@ -192,6 +195,7 @@ CAMLprim value stub_epoll_remove(value es, value fd) {
     struct epoll_state *c_es;
     struct epoll_event event;
 
+    memset(&event, 0, sizeof(event));
     c_es = Epoll_state_val(es);
 
     if (Int_val(fd) > c_es->watch_array_size)
@@ -211,6 +215,7 @@ CAMLprim value stub_epoll_enable_recv(value es, value fd) {
     struct epoll_state *c_es;
     struct epoll_event event;
 
+    memset(&event, 0, sizeof(event));
     c_es = Epoll_state_val(es);
 
     if (Int_val(fd) > c_es->watch_array_size)
@@ -231,6 +236,7 @@ CAMLprim value stub_epoll_disable_recv(value es, value fd) {
     struct epoll_state *c_es;
     struct epoll_event event;
 
+    memset(&event, 0, sizeof(event));
     c_es = Epoll_state_val(es);
 
     if (Int_val(fd) > c_es->watch_array_size)
@@ -251,6 +257,7 @@ CAMLprim value stub_epoll_enable_send(value es, value fd) {
     struct epoll_state *c_es;
     struct epoll_event event;
 
+    memset(&event, 0, sizeof(event));
     c_es = Epoll_state_val(es);
 
     if (Int_val(fd) > c_es->watch_array_size)
@@ -271,6 +278,7 @@ CAMLprim value stub_epoll_disable_send(value es, value fd) {
     struct epoll_state *c_es;
     struct epoll_event event;
 
+    memset(&event, 0, sizeof(event));
     c_es = Epoll_state_val(es);
 
     if (Int_val(fd) > c_es->watch_array_size)
@@ -318,31 +326,20 @@ void fill_event(value result, int idx, int fd, int ev_constr) {
     /* The value needs to correspond to:
        { event_type = ev_constr; event_fd = fd }
      */
-    entry = caml_alloc_small(0, 2);
-    Store_field(entry, RECORD_EVENT_TYPE_OFS, Val_int(ev_constr));
-    Store_field(entry, RECORD_EVENT_FD_OFS, Val_int(fd));
+    entry = caml_alloc_small(2, 0);
+    Field(entry, RECORD_EVENT_TYPE_OFS) = Val_int(ev_constr);
+    Field(entry, RECORD_EVENT_FD_OFS) = Val_int(fd);
+
+    Store_field(result, idx, entry);
 
     CAMLreturn0;
 }
 
-CAMLprim value stub_epoll_get_events(value es, value timeout) {
-    CAMLparam2(es, timeout);
+value prepare_get_events_result(struct epoll_event *events, int n_fdevents) {
+    CAMLparam0();
     CAMLlocal1(result);
 
-    int i, idx, n_fdevents, n_oevents, c_timeout, epoll_fd;
-    struct epoll_event events[MAX_EPOLL_WAIT_EVENTS];
-
-    c_timeout = (int) 1000.0 * (Double_val(timeout) > 0
-                                ? (Double_val(timeout) + 0.5)
-                                : (Double_val(timeout) - 0.5));
-    epoll_fd = Epoll_state_val(es)->epoll_fd;
-
-    caml_enter_blocking_section();
-    n_fdevents = epoll_wait(epoll_fd, events, MAX_EPOLL_WAIT_EVENTS, c_timeout);
-    caml_leave_blocking_section();
-
-    if (n_fdevents < 0)
-        raise_unix_error(errno, "epoll_wait", "");
+    int i, idx, n_oevents;
 
     /* Compute the number of OCaml events to return, which may be more than
        n_fdevents if multiple events occur for a single fd.
@@ -376,6 +373,59 @@ CAMLprim value stub_epoll_get_events(value es, value timeout) {
         if (events[i].events & (EPOLLERR | EPOLLHUP))
             fill_event(result, idx++, events[i].data.fd, CONSTR_EV_PENDING_ERROR);
     }
+
+    CAMLreturn(result);
+}
+
+CAMLprim value stub_epoll_get_events(value es, value timeout) {
+    CAMLparam2(es, timeout);
+    CAMLlocal1(result);
+
+    int n_fdevents, c_timeout, epoll_fd;
+    struct epoll_event events[MAX_EPOLL_WAIT_EVENTS];
+
+    c_timeout = (int) 1000.0 * (Double_val(timeout) > 0
+                                ? (Double_val(timeout) + 0.5)
+                                : (Double_val(timeout) - 0.5));
+    epoll_fd = Epoll_state_val(es)->epoll_fd;
+
+    caml_enter_blocking_section();
+    n_fdevents = epoll_wait(epoll_fd, events, MAX_EPOLL_WAIT_EVENTS, c_timeout);
+    caml_leave_blocking_section();
+
+    if (n_fdevents < 0)
+        raise_unix_error(errno, "epoll_wait", "");
+
+    result = prepare_get_events_result(events, n_fdevents);
+
+    CAMLreturn(result);
+}
+
+CAMLprim value stub_test_get_events(value es) {
+    CAMLparam1(es);
+    CAMLlocal1(result);
+
+    int n_fdevents;
+    struct epoll_event events[5];
+
+    n_fdevents = sizeof(events)/sizeof(struct epoll_event);
+
+    events[0].events = EPOLLIN | EPOLLOUT;
+    events[0].data.fd = 1;
+
+    events[1].events = EPOLLERR;
+    events[1].data.fd = 2;
+
+    events[2].events = EPOLLERR;
+    events[2].data.fd = 1;
+
+    events[3].events = EPOLLRDHUP;
+    events[3].data.fd = 3;
+
+    events[4].events = EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLHUP;
+    events[4].data.fd = 4;
+
+    result = prepare_get_events_result(events, n_fdevents);
 
     CAMLreturn(result);
 }
