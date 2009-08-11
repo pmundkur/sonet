@@ -37,9 +37,6 @@ external is_send_enabled : t -> Unix.file_descr -> bool = "stub_epoll_is_send_en
 
 external get_events : t -> float -> Net_events.event array = "stub_epoll_get_events"
 
-let init () =
-  Callback.register_exception "onet.unix_error_exception" (Unix.Unix_error (Unix.EEXIST, "string", "string"))
-
 let create ?(size=1024) () =
   let t = create_t size in {
       Net_events.add    = add t;

@@ -122,14 +122,23 @@ and t = {
   mutable cur_ev_indx : int;
 }
 
-let create () = {
-  conns = ConnMap.empty;
-  timers = Timers.create ();
-  poller = Unix_poller.create ();
-  current_time = 0.0;
-  cur_events = [||];
-  cur_ev_indx = 0;
-}
+let inited = ref false
+let init () =
+  if not !inited then begin
+    Callback.register_exception "onet.unix_error_exception" (Unix.Unix_error (Unix.EEXIST, "string", "string"));
+    inited := true
+  end
+
+let create () =
+  init ();
+  {
+    conns = ConnMap.empty;
+    timers = Timers.create ();
+    poller = Unix_poller.create ();
+    current_time = 0.0;
+    cur_events = [||];
+    cur_ev_indx = 0;
+  }
 
 (* connections *)
 
