@@ -173,7 +173,7 @@ let get_headers m =
 
 let method_call ?(flags=[]) ~serial ?destination
     ?interface ?(path="/") ~member
-    ~signature ~payload
+    ~signature payload
     =
   V.type_check_args signature payload;
   Msg_method_call {
@@ -190,7 +190,7 @@ let method_call ?(flags=[]) ~serial ?destination
 
 let method_return ?(flags=[]) ~serial ?destination
     ~reply_serial
-    ~signature ~payload
+    ~signature payload
     =
   V.type_check_args signature payload;
   Msg_method_return {
@@ -205,7 +205,7 @@ let method_return ?(flags=[]) ~serial ?destination
 
 let error ?(flags=[]) ~serial ?destination
     ~name ~reply_serial
-    ~signature ~payload
+    ~signature payload
     =
   V.type_check_args signature payload;
   Msg_error {
@@ -221,7 +221,7 @@ let error ?(flags=[]) ~serial ?destination
 
 let signal ?(flags=[]) ~serial ?destination
     ~interface ~path ~member
-    ~signature ~payload
+    ~signature payload
     =
   V.type_check_args signature payload;
   Msg_signal {

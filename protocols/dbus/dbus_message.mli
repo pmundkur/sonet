@@ -101,22 +101,22 @@ val get_headers : t -> (header * (Dbus_type.t * Dbus_value.t)) list
 
 val method_call : ?flags:flag list -> serial:int64 -> ?destination:string
   -> ?interface:string -> ?path:string -> member:string
-  -> signature: Dbus_type.t list -> payload:Dbus_value.t list
+  -> signature:Dbus_type.t list -> Dbus_value.t list
   -> t
 
 val method_return : ?flags:flag list -> serial:int64 -> ?destination:string
   -> reply_serial:int64
-  -> signature: Dbus_type.t list -> payload:Dbus_value.t list
+  -> signature:Dbus_type.t list -> Dbus_value.t list
   -> t
 
 val error : ?flags:flag list -> serial:int64 -> ?destination:string
   -> name:string -> reply_serial:int64
-  -> signature: Dbus_type.t list -> payload:Dbus_value.t list
+  -> signature:Dbus_type.t list -> Dbus_value.t list
   -> t
 
 val signal : ?flags:flag list -> serial:int64 -> ?destination:string
   -> interface:string -> path:string -> member:string
-  -> signature: Dbus_type.t list -> payload:Dbus_value.t list
+  -> signature:Dbus_type.t list -> Dbus_value.t list
   -> t
 
 (* Pretty printer *)
