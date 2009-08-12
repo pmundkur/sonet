@@ -217,3 +217,26 @@ let rec pr_value ff v =
         Format.fprintf ff "@[<v 2>[@,";
         Array.iter (fun v -> pr_value ff v; Format.fprintf ff "@,") va;
         Format.fprintf ff "]@]@,"
+
+let rec to_string v =
+  match v with
+    | V_byte b        -> Printf.sprintf "%d" (Char.code b)
+    | V_boolean b     -> Printf.sprintf "%s" (if b then "true" else "false")
+    | V_int16 i       -> Printf.sprintf "%x(%d)" i i
+    | V_uint16 i      -> Printf.sprintf "%x(%d)" i i
+    | V_int32 i       -> Printf.sprintf "%lx(%ld)" i i
+    | V_uint32 i      -> Printf.sprintf "%Lx(%Ld)" i i
+    | V_int64 i       -> Printf.sprintf "%Lx(%Ld)" i i
+    | V_uint64 i      -> Printf.sprintf "%Lx(%Ld)" i i
+    | V_double d      -> Printf.sprintf "%f" d
+    | V_string s      -> Printf.sprintf "%s" s
+    | V_object_path o -> Printf.sprintf "%s" o
+    | V_signature tl  -> Printf.sprintf "%s" (T.signature_of_types tl)
+    | V_struct vl     ->
+        "(" ^ (String.concat "," (List.map to_string vl)) ^ ")"
+    | V_variant (t, v) ->
+        (T.to_string t) ^ ":" ^ to_string v
+    | V_array va      ->
+        (Printf.sprintf "[<%d>" (Array.length va))
+        ^ (String.concat "," (List.map to_string (Array.to_list va)))
+        ^ "]"

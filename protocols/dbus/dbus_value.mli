@@ -63,6 +63,7 @@ type error =
 
 exception Invalid_value_error of error
 
+val to_string : t -> string
 val string_type_of : t -> string
 
 (* String validity checker: raises Invalid_value_error String_error *)
