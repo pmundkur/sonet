@@ -1,0 +1,26 @@
+FILES[] =
+	dbus_test
+
+OCAMLINCLUDES += ..
+
+OCAML_LIBS[] +=
+	$(EVENTLOOP_DIR)/eventloop
+        ../dbus
+
+OCAML_OTHER_LIBS[] +=
+	unix
+
+PROGRAM = dbus_test
+DBUS_TEST = $(OCamlProgram $(PROGRAM), $(FILES))
+
+FILES[] =
+	parse_test
+PROGRAM = parse_test
+PARSE_TEST = $(OCamlProgram $(PROGRAM), $(FILES))
+
+.DEFAULT: $(DBUS_TEST) $(PARSE_TEST)
+
+.PHONY: clean
+
+clean:
+	$(CLEAN) $(DBUS_TEST) $(PARSE_TEST)
