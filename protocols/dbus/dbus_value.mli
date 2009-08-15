@@ -39,6 +39,9 @@ type t =
   | V_struct of t list
   | V_variant of Dbus_type.t * t
 
+val to_string : t -> string
+val string_type_of : t -> string
+
 (* Kinds of invalid errors. *)
 
 type object_path_error =
@@ -63,8 +66,10 @@ type error =
 
 exception Invalid_value_error of error
 
-val to_string : t -> string
-val string_type_of : t -> string
+val object_path_error_message : object_path_error -> string
+val string_error_message : string_error -> string
+val type_check_error_message : type_check_error -> string
+val error_message : error -> string
 
 (* String validity checker: raises Invalid_value_error String_error *)
 val check_valid_string : string -> unit

@@ -32,11 +32,27 @@ type header =
   | Hdr_sender
   | Hdr_signature
 
+let header_to_string = function
+  | Hdr_path            -> "PATH"
+  | Hdr_interface       -> "INTERFACE"
+  | Hdr_member          -> "MEMBER"
+  | Hdr_error_name      -> "ERROR_NAME"
+  | Hdr_reply_serial    -> "REPLY_SERIAL"
+  | Hdr_destination     -> "DESTINATION"
+  | Hdr_sender          -> "SENDER"
+  | Hdr_signature       -> "SIGNATURE"
+
 type msg_type =
   | Msg_type_method_call
   | Msg_type_method_return
   | Msg_type_error
   | Msg_type_signal
+
+let msg_type_to_string = function
+  | Msg_type_method_call    -> "METHOD_CALL"
+  | Msg_type_method_return  -> "METHOD_RETURN"
+  | Msg_type_error          -> "ERROR"
+  | Msg_type_signal         -> "SIGNAL"
 
 type method_call = {
   method_call_flags : flag list;

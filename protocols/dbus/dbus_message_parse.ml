@@ -57,6 +57,20 @@ type error =
   | Missing_signature_header_for_payload
   | Missing_required_header of M.msg_type * M.header
 
+let error_message = function
+  | Invalid_endian ->
+      "invalid endian byte"
+  | Unknown_msg_type i ->
+      Printf.sprintf "unknown message type %d" i
+  | Unexpected_header_type (h, r, e) ->
+      Printf.sprintf "header %s had a value of type %s, but a %s was expected"
+        (M.header_to_string h) (T.to_string r) (T.to_string e)
+  | Missing_signature_header_for_payload ->
+      "no signature for payload"
+  | Missing_required_header (mt, h) ->
+      Printf.sprintf "header %s is required for a %s"
+        (M.header_to_string h) (M.msg_type_to_string mt)
+
 exception Parse_error of error
 let raise_error e =
   raise (Parse_error e)

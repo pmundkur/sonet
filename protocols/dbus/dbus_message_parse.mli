@@ -22,6 +22,8 @@ type error =
   | Missing_signature_header_for_payload
   | Missing_required_header of Dbus_message.msg_type * Dbus_message.header
 
+val error_message : error -> string
+
 exception Parse_error of error
 
 type state

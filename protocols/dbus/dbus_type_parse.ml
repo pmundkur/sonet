@@ -27,9 +27,24 @@ type inv_reason =
   | Inv_variant_signature of V.t
   | Inv_array_length
 
+let inv_reason_message = function
+  | Inv_non_boolean         -> "Invalid boolean"
+  | Inv_string e            -> Printf.sprintf "Invalid string: %s" (V.string_error_message e)
+  | Inv_object_path e       -> Printf.sprintf "Invalid object-path: %s" (V.object_path_error_message e)
+  | Inv_signature e         -> Printf.sprintf "Invalid signature: %s" (T.sig_error_message e)
+  | Inv_variant_signature v -> Printf.sprintf "Invalid variant signature for %s" (V.to_string v)
+  | Inv_array_length        -> "Invalid array length"
+
 type error =
-  | Insufficient_data of T.t
+  | Insufficient_data of T.t * (* remaining bytes *) int * (* needed bytes *) int
   | Invalid_value of T.t * inv_reason
+
+let error_message = function
+  | Insufficient_data (t, r, n) ->
+      Printf.sprintf "Insufficient data for type %s: %d bytes remaining, %d needed"
+	(T.to_string t) r n
+  | Invalid_value (t, r) ->
+      Printf.sprintf "Invalid %s value: %s" (T.to_string t) (inv_reason_message r)
 
 exception Parse_error of error
 let raise_error e =
@@ -40,6 +55,7 @@ type context = {
   buffer : string;
   offset : int;
   length : int;
+  starting_offset : int;
 }
 
 let init_context endian buffer ~offset:offset ~length:length =
@@ -48,6 +64,7 @@ let init_context endian buffer ~offset:offset ~length:length =
     buffer = buffer;
     offset = offset;
     length = length;
+    starting_offset = offset;
   }
 
 let append_bytes ctxt str ~offset:ofs ~length:len =
@@ -55,6 +72,9 @@ let append_bytes ctxt str ~offset:ofs ~length:len =
       buffer = ctxt.buffer ^ (String.sub str ofs len);
       length = ctxt.length + len;
   }
+
+let num_parsed_bytes ctxt =
+  ctxt.offset - ctxt.starting_offset
 
 let advance ctxt nbytes =
   assert (ctxt.length >= nbytes);
@@ -73,7 +93,7 @@ let rewind ctxt nbytes =
 let check_and_align_context ctxt ~align ~size dtype =
   let padding = T.get_padding ~offset:ctxt.offset ~align in
     if ctxt.length < padding + size then
-      raise_error (Insufficient_data dtype);
+      raise_error (Insufficient_data (dtype, ctxt.length, padding + size));
     advance ctxt padding
 
 let take_byte ?(dtype=T.T_base T.B_byte) ctxt =

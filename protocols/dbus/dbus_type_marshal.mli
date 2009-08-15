@@ -21,6 +21,8 @@ type error =
 
 exception Marshal_error of error
 
+val error_message : error -> string
+
 type context
 
 val init_context : stream_offset:int -> Dbus_type.endian -> string -> offset:int -> length:int -> context

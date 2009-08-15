@@ -23,6 +23,10 @@ type error =
   | Signature_too_long
   | Insufficient_space of T.t
 
+let error_message = function
+  | Signature_too_long   -> "Signature too long"
+  | Insufficient_space t -> Printf.sprintf "Insufficient space for %s" (T.to_string t)
+
 exception Marshal_error of error
 let raise_error e =
   raise (Marshal_error e)

@@ -1,4 +1,4 @@
-OCAMLFLAGS += -dtypes
+OCAMLFLAGS += -dtypes -g
 OCAMLINCLUDES += $(EVENTLOOP_DIR)
 
 DBUS_FILES[] =

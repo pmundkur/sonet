@@ -36,38 +36,38 @@ type t =
   | T_struct of t list  (* 'r', '(' .. ')' *)
 
 let rec to_string = function
-  | T_base B_byte ->        "byte"
-  | T_base B_boolean ->     "boolean"
-  | T_base B_int16 ->       "int16"
-  | T_base B_uint16 ->      "uint16"
-  | T_base B_int32 ->       "int32"
-  | T_base B_uint32 ->      "uint32"
-  | T_base B_int64 ->       "int64"
-  | T_base B_uint64 ->      "uint64"
-  | T_base B_double ->      "double"
-  | T_base B_string ->      "string"
+  | T_base B_byte        -> "byte"
+  | T_base B_boolean     -> "boolean"
+  | T_base B_int16       -> "int16"
+  | T_base B_uint16      -> "uint16"
+  | T_base B_int32       -> "int32"
+  | T_base B_uint32      -> "uint32"
+  | T_base B_int64       -> "int64"
+  | T_base B_uint64      -> "uint64"
+  | T_base B_double      -> "double"
+  | T_base B_string      -> "string"
   | T_base B_object_path -> "object_path"
-  | T_base B_signature ->   "signature"
-  | T_variant ->            "variant"
-  | T_array t ->            "array(" ^ (to_string t) ^ ")"
-  | T_struct tl ->          "struct(" ^ String.concat "," (List.map to_string tl) ^ ")"
+  | T_base B_signature   -> "signature"
+  | T_variant            -> "variant"
+  | T_array t            -> "array(" ^ (to_string t) ^ ")"
+  | T_struct tl          -> "struct(" ^ String.concat "," (List.map to_string tl) ^ ")"
 
 let rec to_code = function
-  | T_base B_byte ->        "y"
-  | T_base B_boolean ->     "b"
-  | T_base B_int16 ->       "n"
-  | T_base B_uint16 ->      "q"
-  | T_base B_int32 ->       "i"
-  | T_base B_uint32 ->      "u"
-  | T_base B_int64 ->       "x"
-  | T_base B_uint64 ->      "t"
-  | T_base B_double ->      "d"
-  | T_base B_string ->      "s"
+  | T_base B_byte        -> "y"
+  | T_base B_boolean     -> "b"
+  | T_base B_int16       -> "n"
+  | T_base B_uint16      -> "q"
+  | T_base B_int32       -> "i"
+  | T_base B_uint32      -> "u"
+  | T_base B_int64       -> "x"
+  | T_base B_uint64      -> "t"
+  | T_base B_double      -> "d"
+  | T_base B_string      -> "s"
   | T_base B_object_path -> "o"
-  | T_base B_signature ->   "g"
-  | T_variant ->            "v"
-  | T_array t ->            "a" ^ (to_code t)
-  | T_struct tl ->          "(" ^ String.concat "" (List.map to_string tl) ^ ")"
+  | T_base B_signature   -> "g"
+  | T_variant            -> "v"
+  | T_array t            -> "a" ^ (to_code t)
+  | T_struct tl          -> "(" ^ String.concat "" (List.map to_string tl) ^ ")"
 
 let is_basic_type = function
   | T_base _ -> true
@@ -76,21 +76,21 @@ let is_basic_type = function
 let is_container_type t = not (is_basic_type t)
 
 let alignment_of = function
-  | T_base B_byte ->        1
-  | T_base B_boolean ->     4
-  | T_base B_int16 ->       2
-  | T_base B_uint16 ->      2
-  | T_base B_int32 ->       4
-  | T_base B_uint32 ->      4
-  | T_base B_int64 ->       8
-  | T_base B_uint64 ->      8
-  | T_base B_double ->      8
-  | T_base B_string ->      4
+  | T_base B_byte        -> 1
+  | T_base B_boolean     -> 4
+  | T_base B_int16       -> 2
+  | T_base B_uint16      -> 2
+  | T_base B_int32       -> 4
+  | T_base B_uint32      -> 4
+  | T_base B_int64       -> 8
+  | T_base B_uint64      -> 8
+  | T_base B_double      -> 8
+  | T_base B_string      -> 4
   | T_base B_object_path -> 4
-  | T_base B_signature ->   1
-  | T_variant ->            1
-  | T_array _ ->            4
-  | T_struct _ ->           8
+  | T_base B_signature   -> 1
+  | T_variant            -> 1
+  | T_array _            -> 4
+  | T_struct _           -> 8
 
 let get_padding ~offset ~align =
   let ofs = offset mod align in
@@ -106,6 +106,12 @@ type sig_error =
   | Sig_incomplete
   | Sig_invalid of string
   | Sig_invalid_char of char
+
+let sig_error_message = function
+  | Sig_incomplete     -> "incomplete signature"
+  | Sig_invalid s      -> Printf.sprintf "invalid signature '%s'" s
+  | Sig_invalid_char c -> Printf.sprintf "invalid signature char '%c'" c
+
 exception Invalid_signature of sig_error
 let raise_sig_error se = raise (Invalid_signature se)
 
@@ -196,19 +202,19 @@ let signature_of_string s =
 
 let signature_of_types tlist =
   let rec sig_one = function
-    | T_base B_byte -> "y"
-    | T_base B_boolean -> "b"
-    | T_base B_int16 -> "n"
-    | T_base B_uint16 -> "q"
-    | T_base B_int32 -> "i"
-    | T_base B_uint32 -> "u"
-    | T_base B_int64 -> "x"
-    | T_base B_uint64 -> "t"
-    | T_base B_double -> "d"
-    | T_base B_string -> "s"
+    | T_base B_byte        -> "y"
+    | T_base B_boolean     -> "b"
+    | T_base B_int16       -> "n"
+    | T_base B_uint16      -> "q"
+    | T_base B_int32       -> "i"
+    | T_base B_uint32      -> "u"
+    | T_base B_int64       -> "x"
+    | T_base B_uint64      -> "t"
+    | T_base B_double      -> "d"
+    | T_base B_string      -> "s"
     | T_base B_object_path -> "o"
-    | T_base B_signature -> "g"
-    | T_variant -> "v"
+    | T_base B_signature   -> "g"
+    | T_variant            -> "v"
     | T_array t ->
         "a" ^ (match as_dict_entry t with
                  | Some (k, v) -> "{" ^ sig_one k ^ sig_one v ^ "}"

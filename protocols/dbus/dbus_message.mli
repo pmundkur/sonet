@@ -29,6 +29,8 @@ type header =
   | Hdr_sender
   | Hdr_signature
 
+val header_to_string : header -> string
+
 type method_call = {
   method_call_flags : flag list;
   method_call_serial : int64;
@@ -79,6 +81,8 @@ type msg_type =
   | Msg_type_method_return
   | Msg_type_error
   | Msg_type_signal
+
+val msg_type_to_string : msg_type -> string
 
 type t =
   | Msg_method_call of method_call

@@ -24,22 +24,19 @@ type inv_reason =
   | Inv_array_length
 
 type error =
-  | Insufficient_data of Dbus_type.t
+  | Insufficient_data of Dbus_type.t * (* remaining bytes *) int * (* needed bytes *) int
   | Invalid_value of Dbus_type.t * inv_reason
+
+val error_message : error -> string
 
 exception Parse_error of error
 
-type context =
-    {
-      endian : Dbus_type.endian;
-      buffer : string;
-      offset : int;
-      length : int;
-    }
+type context
 
 val init_context : Dbus_type.endian -> string -> offset:int -> length:int -> context
 
 val append_bytes : context -> string -> offset:int -> length:int -> context
+val num_parsed_bytes : context -> int
 val advance : context -> int -> context
 val rewind : context -> int -> context
 val check_and_align_context : context -> align:int -> size:int -> Dbus_type.t -> context

@@ -34,36 +34,28 @@ type t =
   | V_struct of t list
   | V_variant of T.t * t
 
-type object_path_error =
-  | OP_with_invalid_char
-  | OP_with_consecutive_slashes
-  | OP_with_non_slash_prefix
-  | OP_is_slash_terminated
-
-type string_error =
-  | String_with_embedded_nul
-  | String_not_nul_terminated
-
-type type_check_error =
-  | Type_mismatch of T.t * t
-  | Type_arg_length_mismatch of T.t list * t list
-
-type error =
-  | Untyped_array
-  | String_error of string_error
-  | Object_path_error of object_path_error
-  | Type_check_error of type_check_error
-
-exception Invalid_value_error of error
-let raise_error e =
-  raise (Invalid_value_error e)
-
-let raise_string_error e =
-  raise (Invalid_value_error (String_error e))
-let raise_object_path_error e =
-  raise (Invalid_value_error (Object_path_error e))
-let raise_type_check_error e =
-  raise (Invalid_value_error (Type_check_error e))
+let rec to_string v =
+  match v with
+    | V_byte b        -> Printf.sprintf "%d" (Char.code b)
+    | V_boolean b     -> Printf.sprintf "%s" (if b then "true" else "false")
+    | V_int16 i       -> Printf.sprintf "%x(%d)" i i
+    | V_uint16 i      -> Printf.sprintf "%x(%d)" i i
+    | V_int32 i       -> Printf.sprintf "%lx(%ld)" i i
+    | V_uint32 i      -> Printf.sprintf "%Lx(%Ld)" i i
+    | V_int64 i       -> Printf.sprintf "%Lx(%Ld)" i i
+    | V_uint64 i      -> Printf.sprintf "%Lx(%Ld)" i i
+    | V_double d      -> Printf.sprintf "%f" d
+    | V_string s      -> Printf.sprintf "%s" s
+    | V_object_path o -> Printf.sprintf "%s" o
+    | V_signature tl  -> Printf.sprintf "%s" (T.signature_of_types tl)
+    | V_struct vl     ->
+        "(" ^ (String.concat "," (List.map to_string vl)) ^ ")"
+    | V_variant (t, v) ->
+        (T.to_string t) ^ ":" ^ to_string v
+    | V_array va      ->
+        (Printf.sprintf "[<%d>" (Array.length va))
+        ^ (String.concat "," (List.map to_string (Array.to_list va)))
+        ^ "]"
 
 let rec string_type_of = function
   | V_byte _        -> "byte"
@@ -81,6 +73,65 @@ let rec string_type_of = function
   | V_array _       -> "array"
   | V_struct _      -> "struct"
   | V_variant _     -> "variant"
+
+type object_path_error =
+  | OP_with_invalid_char
+  | OP_with_consecutive_slashes
+  | OP_with_non_slash_prefix
+  | OP_is_slash_terminated
+
+let object_path_error_message = function
+  | OP_with_invalid_char        -> "invalid char"
+  | OP_with_consecutive_slashes -> "consecutive slashes"
+  | OP_with_non_slash_prefix    -> "non-slash prefix"
+  | OP_is_slash_terminated      -> "slash-terminated"
+
+type string_error =
+  | String_with_embedded_nul
+  | String_not_nul_terminated
+
+let string_error_message = function
+  | String_with_embedded_nul    -> "embedded nul in string"
+  | String_not_nul_terminated   -> "not a nul-terminated string"
+
+type type_check_error =
+  | Type_mismatch of T.t * t
+  | Type_arg_length_mismatch of T.t list * t list
+
+let type_check_error_message = function
+  | Type_mismatch (t, v) ->
+      Printf.sprintf "value %s is not of type %s"
+	(to_string v) (T.to_string t)
+  | Type_arg_length_mismatch (tlist, vlist) ->
+      Printf.sprintf "%d values expected, %d found"
+	(List.length tlist) (List.length vlist)
+
+type error =
+  | Untyped_array
+  | String_error of string_error
+  | Object_path_error of object_path_error
+  | Type_check_error of type_check_error
+
+let error_message = function
+  | Untyped_array ->
+      "untyped array"
+  | String_error e ->
+      Printf.sprintf "invalid string: %s" (string_error_message e)
+  | Object_path_error e ->
+      Printf.sprintf "invalid object-path: %s" (object_path_error_message e)
+  | Type_check_error e ->
+      Printf.sprintf "type check error: %s" (type_check_error_message e)
+
+exception Invalid_value_error of error
+let raise_error e =
+  raise (Invalid_value_error e)
+
+let raise_string_error e =
+  raise (Invalid_value_error (String_error e))
+let raise_object_path_error e =
+  raise (Invalid_value_error (Object_path_error e))
+let raise_type_check_error e =
+  raise (Invalid_value_error (Type_check_error e))
 
 (* Valid String:
    A UINT32 indicating the string's length in bytes excluding its
@@ -217,26 +268,3 @@ let rec pr_value ff v =
         Format.fprintf ff "@[<v 2>[@,";
         Array.iter (fun v -> pr_value ff v; Format.fprintf ff "@,") va;
         Format.fprintf ff "]@]@,"
-
-let rec to_string v =
-  match v with
-    | V_byte b        -> Printf.sprintf "%d" (Char.code b)
-    | V_boolean b     -> Printf.sprintf "%s" (if b then "true" else "false")
-    | V_int16 i       -> Printf.sprintf "%x(%d)" i i
-    | V_uint16 i      -> Printf.sprintf "%x(%d)" i i
-    | V_int32 i       -> Printf.sprintf "%lx(%ld)" i i
-    | V_uint32 i      -> Printf.sprintf "%Lx(%Ld)" i i
-    | V_int64 i       -> Printf.sprintf "%Lx(%Ld)" i i
-    | V_uint64 i      -> Printf.sprintf "%Lx(%Ld)" i i
-    | V_double d      -> Printf.sprintf "%f" d
-    | V_string s      -> Printf.sprintf "%s" s
-    | V_object_path o -> Printf.sprintf "%s" o
-    | V_signature tl  -> Printf.sprintf "%s" (T.signature_of_types tl)
-    | V_struct vl     ->
-        "(" ^ (String.concat "," (List.map to_string vl)) ^ ")"
-    | V_variant (t, v) ->
-        (T.to_string t) ^ ":" ^ to_string v
-    | V_array va      ->
-        (Printf.sprintf "[<%d>" (Array.length va))
-        ^ (String.concat "," (List.map to_string (Array.to_list va)))
-        ^ "]"

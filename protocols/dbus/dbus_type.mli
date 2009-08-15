@@ -53,6 +53,8 @@ type sig_error =
   | Sig_invalid of string
   | Sig_invalid_char of char
 
+val sig_error_message : sig_error -> string
+
 exception Invalid_signature of sig_error
 
 val signature_of_string : string -> t list
