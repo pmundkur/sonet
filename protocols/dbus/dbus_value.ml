@@ -101,10 +101,10 @@ type type_check_error =
 let type_check_error_message = function
   | Type_mismatch (t, v) ->
       Printf.sprintf "value %s is not of type %s"
-	(to_string v) (T.to_string t)
+        (to_string v) (T.to_string t)
   | Type_arg_length_mismatch (tlist, vlist) ->
       Printf.sprintf "%d values expected, %d found"
-	(List.length tlist) (List.length vlist)
+        (List.length tlist) (List.length vlist)
 
 type error =
   | Untyped_array
@@ -165,7 +165,7 @@ let is_valid_objectpath_char = function
 let check_valid_object_path s =
   let slen = String.length s in
   let prev_was_slash = ref false in
-    for i = 0 to slen do
+    for i = 0 to slen - 1 do
       if not (is_valid_objectpath_char s.[i]) then
         raise_object_path_error OP_with_invalid_char;
       if not !prev_was_slash && s.[i] = '/' then

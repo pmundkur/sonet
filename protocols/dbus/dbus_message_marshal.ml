@@ -95,5 +95,9 @@ let marshal_message ~stream_offset endian buffer ~offset ~length m =
   let ctxt = P.marshal_uint32 ctxt (V.V_uint32 (M.get_serial m)) in
   let ctxt = (P.marshal_complete_type ctxt Protocol.hdr_array_type
                 (pack_headers (M.get_headers m))) in
+    (* Align the payload body on a 8-byte boundary; see comment in
+       compute_marshaled_size. *)
+  let ctxt = P.advance ctxt (T.get_padding ~offset:(P.get_current_stream_offset ctxt) ~align:8) in
   let ctxt = P.marshal_payload ctxt signature payload in
-    P.get_marshaled_size ctxt
+    1 (* the endian byte was marshaled outside the context *) + P.get_marshaled_size ctxt
+

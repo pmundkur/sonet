@@ -55,31 +55,34 @@ let rec compute_marshaled_size ~stream_offset t v =
           let offset = stream_offset + padding + 4 in
           let end_offset =
             Array.fold_left (fun stream_offset ve ->
-                                 offset + compute_marshaled_size ~stream_offset te ve
+                               stream_offset + compute_marshaled_size ~stream_offset te ve
                             ) offset va
           in end_offset - stream_offset
       | T.T_struct tl, V.V_struct vl ->
           let offset = stream_offset + padding in
           let end_offset =
             List.fold_left2 (fun stream_offset t v ->
-                               offset + compute_marshaled_size ~stream_offset t v
+                               stream_offset + compute_marshaled_size ~stream_offset t v
                             ) offset tl vl
           in end_offset - stream_offset
       | T.T_variant, V.V_variant (t, v) ->
           let offset = stream_offset + padding in
-          let offset = offset + (compute_marshaled_size ~stream_offset:offset
-                                   (T.T_base T.B_signature) (V.V_signature [ t ]))) in
+          let offset = (offset +
+                          (compute_marshaled_size ~stream_offset:offset
+                             (T.T_base T.B_signature) (V.V_signature [ t ]))) in
           let offset = offset + compute_marshaled_size ~stream_offset:offset t v
           in offset - stream_offset
       | _ ->
           (* We should never reach here after the type_check in the first line. *)
-        assert false
+          assert false
 
 let compute_payload_marshaled_size ~stream_offset tlist vlist =
   V.type_check_args tlist vlist;
-  List.fold_left2 (fun offset t v ->
-                       offset + compute_marshaled_size ~stream_offset t v
+  let offset =
+    List.fold_left2 (fun stream_offset t v ->
+                       stream_offset + compute_marshaled_size ~stream_offset t v
                     ) stream_offset tlist vlist
+  in offset - stream_offset
 
 type context = {
   endian : T.endian;
@@ -258,7 +261,8 @@ let marshal_double ctxt v =
 let put_string ?(dtype=T.T_base T.B_string) ctxt s =
   let slen = String.length s in
     (* TODO: fix so that we can check_context for appropriate size *)
-  let ctxt = put_u32 ~dtype:(T.T_base T.B_string) ctxt (from_uint32 ctxt.endian (Int64.of_int slen)) in
+  let ctxt = (put_u32 ~dtype:(T.T_base T.B_string) ctxt
+                (from_uint32 ctxt.endian (Int64.of_int slen))) in
     String.blit s 0 ctxt.buffer ctxt.current_buffer_offset slen;
     let ctxt = advance ctxt slen in
       put_byte ctxt '\x00'
@@ -275,8 +279,7 @@ let marshal_signature ctxt v =
   let tl = C.to_signature v in
   let signature = T.signature_of_types tl in
   let slen = String.length signature in
-  let ctxt = (check_and_align_context ctxt
-                ~align:1 ~size:(1 + slen + 1)
+  let ctxt = (check_and_align_context ctxt ~align:1 ~size:(1 + slen + 1)
                 (T.T_base T.B_signature)) in
   let ctxt = put_byte ctxt (Char.chr slen) in
     String.blit signature 0 ctxt.buffer ctxt.current_buffer_offset slen;
@@ -303,8 +306,32 @@ let rec marshal_complete_type ctxt t v =
     | T.T_base b, _ ->
         (get_base_marshaler b) ctxt v
     | T.T_array te, V.V_array va ->
-        let ctxt = put_u32 ~dtype:t ctxt (from_int32 ctxt.endian
-                                            (Int32.of_int (Array.length va))) in
+        (* "A UINT32 giving the length of the array data in bytes,
+           followed by alignment padding to the alignment boundary of the
+           array element type, followed by each array element. The array
+           length is from the end of the alignment padding to the end of
+           the last element, i.e. it does not include the padding after
+           the length, or any padding after the last element."
+
+           We need to compute the size of the array in bytes; to do
+           that using compute_marshaled_size, we need to compute the
+           stream_offset at which the array data will be marshaled.
+        *)
+        let stream_offset = get_current_stream_offset ctxt in
+          (* Compute the padding before we put down the array size. *)
+        let pre_size_padding  = T.get_padding ~offset:stream_offset ~align:4 in
+          (* Compute the padding after the array size, but before the
+             array data. *)
+        let pre_data_padding_offset = stream_offset + pre_size_padding + 4 in
+        let pre_data_padding = (T.get_padding ~offset:pre_data_padding_offset
+                                  ~align:(T.alignment_of te)) in
+        let data_start_offset = pre_data_padding_offset + pre_data_padding in
+        let end_offset =
+          Array.fold_left (fun stream_offset ve ->
+                             stream_offset + compute_marshaled_size ~stream_offset te ve
+                          ) data_start_offset va in
+        let array_size = end_offset - data_start_offset in
+        let ctxt = put_u32 ~dtype:t ctxt (from_int32 ctxt.endian (Int32.of_int array_size)) in
           Array.fold_left (fun ctxt v ->
                              marshal_complete_type ctxt te v
                           ) ctxt va

@@ -28,12 +28,12 @@ type inv_reason =
   | Inv_array_length
 
 let inv_reason_message = function
-  | Inv_non_boolean         -> "Invalid boolean"
-  | Inv_string e            -> Printf.sprintf "Invalid string: %s" (V.string_error_message e)
-  | Inv_object_path e       -> Printf.sprintf "Invalid object-path: %s" (V.object_path_error_message e)
-  | Inv_signature e         -> Printf.sprintf "Invalid signature: %s" (T.sig_error_message e)
-  | Inv_variant_signature v -> Printf.sprintf "Invalid variant signature for %s" (V.to_string v)
-  | Inv_array_length        -> "Invalid array length"
+  | Inv_non_boolean         -> "invalid boolean"
+  | Inv_string e            -> Printf.sprintf "invalid string: %s" (V.string_error_message e)
+  | Inv_object_path e       -> Printf.sprintf "invalid object-path: %s" (V.object_path_error_message e)
+  | Inv_signature e         -> Printf.sprintf "invalid signature: %s" (T.sig_error_message e)
+  | Inv_variant_signature v -> Printf.sprintf "invalid variant signature for %s" (V.to_string v)
+  | Inv_array_length        -> "invalid array length"
 
 type error =
   | Insufficient_data of T.t * (* remaining bytes *) int * (* needed bytes *) int
@@ -41,10 +41,10 @@ type error =
 
 let error_message = function
   | Insufficient_data (t, r, n) ->
-      Printf.sprintf "Insufficient data for type %s: %d bytes remaining, %d needed"
-	(T.to_string t) r n
+      Printf.sprintf "insufficient data for type %s: %d bytes remaining, %d needed"
+        (T.to_string t) r n
   | Invalid_value (t, r) ->
-      Printf.sprintf "Invalid %s value: %s" (T.to_string t) (inv_reason_message r)
+      Printf.sprintf "invalid %s value: %s" (T.to_string t) (inv_reason_message r)
 
 exception Parse_error of error
 let raise_error e =
@@ -58,14 +58,13 @@ type context = {
   starting_offset : int;
 }
 
-let init_context endian buffer ~offset:offset ~length:length =
-  {
-    endian = endian;
-    buffer = buffer;
-    offset = offset;
-    length = length;
-    starting_offset = offset;
-  }
+let init_context endian buffer ~offset:offset ~length:length = {
+  endian = endian;
+  buffer = buffer;
+  offset = offset;
+  length = length;
+  starting_offset = offset;
+}
 
 let append_bytes ctxt str ~offset:ofs ~length:len =
   { ctxt with
@@ -237,7 +236,7 @@ let take_string ?(dtype=T.T_base T.B_string) ctxt =
     check_valid_string ~dtype s;
     if ctxt.buffer.[ctxt.offset + len] <> '\x00' then
       raise_error (Invalid_value (dtype, Inv_string V.String_not_nul_terminated));
-    s, (advance ctxt (len + 1))
+    s, advance ctxt (len + 1)
 
 let parse_string ctxt =
   let s, ctxt = take_string ctxt in
@@ -260,8 +259,12 @@ let parse_signature ctxt =
   let b, ctxt = take_byte ~dtype ctxt in
   let slen = Char.code b in
   let s = String.sub ctxt.buffer ctxt.offset slen in
-    try V.V_signature (T.signature_of_string s), advance ctxt slen
-    with T.Invalid_signature se -> raise_error (Invalid_value (dtype, Inv_signature se))
+  let signature = (try T.signature_of_string s
+                   with T.Invalid_signature se ->
+                     raise_error (Invalid_value (dtype, Inv_signature se))) in
+    if ctxt.buffer.[ctxt.offset + slen] <> '\x00' then
+      raise_error (Invalid_value (dtype, Inv_signature T.Sig_not_nul_terminated));
+    V.V_signature signature, advance ctxt (slen + 1)
 
 let parse_double ctxt =
   let dtype = T.T_base T.B_double in
@@ -285,40 +288,51 @@ let get_base_parser = function
   | T.B_signature ->    parse_signature
 
 let rec parse_complete_type dtype ctxt =
-  match dtype with
-    | T.T_base b ->
-        (get_base_parser b) ctxt
-    | T.T_variant ->
-        let s, ctxt = parse_signature ctxt in
-        let tl = C.to_signature s in
-        let t = (match tl with
-                   | [ t ] -> t
-                   | _     ->
-                       raise_error (Invalid_value (dtype, Inv_variant_signature s))
-                ) in
-        let v, ctxt = parse_complete_type t ctxt in
-          V.V_variant (t, v), ctxt
-    | T.T_array t ->
-        let len, ctxt = take_uint32 ~dtype ctxt in
-        let len = Int64.to_int len in
-        let align = T.alignment_of t in
-        let ctxt = check_and_align_context ctxt ~align ~size:len dtype in
-        let end_offset = ctxt.offset + len in
-        let rec iter acc ctxt =
-          if ctxt.offset < end_offset then
-            let e, ctxt = parse_complete_type t ctxt in
-              iter (e :: acc) ctxt
-          else acc, ctxt in
-        let alist, ctxt = iter [] ctxt in
-          if ctxt.offset > end_offset then raise_error (Invalid_value (dtype, Inv_array_length))
-          else V.V_array (Array.of_list (List.rev alist)), ctxt
-    | T.T_struct tl ->
-        let align = T.alignment_of dtype in
-        (* the below call only performs alignment; the length check
-           is performed during the loop. *)
-        let ctxt = check_and_align_context ctxt ~align ~size:0 dtype in
-        let vl, ctxt = parse_type_list tl ctxt in
-          V.V_array (Array.of_list (List.rev vl)), ctxt
+  let v, ctxt' =
+    match dtype with
+      | T.T_base b ->
+          (get_base_parser b) ctxt
+      | T.T_variant ->
+          let s, ctxt = parse_signature ctxt in
+          let tl = C.to_signature s in
+          let t = (match tl with
+                     | [ t ] -> t
+                     | _     ->
+                         raise_error (Invalid_value (dtype, Inv_variant_signature s))
+                  ) in
+          let v, ctxt = parse_complete_type t ctxt in
+            V.V_variant (t, v), ctxt
+      | T.T_array t ->
+          (* "A UINT32 giving the length of the array data in bytes,
+             followed by alignment padding to the alignment boundary of the
+             array element type, followed by each array element. The array
+             length is from the end of the alignment padding to the end of
+             the last element, i.e. it does not include the padding after
+             the length, or any padding after the last element."
+          *)
+          let len, ctxt = take_uint32 ~dtype ctxt in
+          let len = Int64.to_int len in
+          let align = T.alignment_of t in
+          let ctxt = check_and_align_context ctxt ~align ~size:len dtype in
+          let end_offset = ctxt.offset + len in
+          let rec iter acc ctxt =
+            if ctxt.offset < end_offset then
+              let e, ctxt = parse_complete_type t ctxt in
+                iter (e :: acc) ctxt
+            else acc, ctxt in
+          let alist, ctxt = iter [] ctxt in
+            if ctxt.offset > end_offset then raise_error (Invalid_value (dtype, Inv_array_length))
+            else V.V_array (Array.of_list (List.rev alist)), ctxt
+      | T.T_struct tl ->
+          let align = T.alignment_of dtype in
+            (* the below call only performs alignment; the length check
+               is performed during the loop. *)
+          let ctxt = check_and_align_context ctxt ~align ~size:0 dtype in
+          let vl, ctxt = parse_type_list tl ctxt in
+            V.V_struct vl, ctxt
+  in
+    V.type_check dtype v;
+    v, ctxt'
 
 and parse_type_list dtypes ctxt =
   let vl, ctxt =

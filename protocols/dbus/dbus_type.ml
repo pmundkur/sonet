@@ -106,11 +106,13 @@ type sig_error =
   | Sig_incomplete
   | Sig_invalid of string
   | Sig_invalid_char of char
+  | Sig_not_nul_terminated
 
 let sig_error_message = function
-  | Sig_incomplete     -> "incomplete signature"
-  | Sig_invalid s      -> Printf.sprintf "invalid signature '%s'" s
-  | Sig_invalid_char c -> Printf.sprintf "invalid signature char '%c'" c
+  | Sig_incomplete          -> "incomplete signature"
+  | Sig_invalid s           -> Printf.sprintf "invalid signature '%s'" s
+  | Sig_invalid_char c      -> Printf.sprintf "invalid signature char '%c'" c
+  | Sig_not_nul_terminated  -> "not a nul-terminated signature"
 
 exception Invalid_signature of sig_error
 let raise_sig_error se = raise (Invalid_signature se)
@@ -151,10 +153,10 @@ let rec get_complete_type clist in_array =
     | 'g' :: rem ->
         (T_base B_signature), rem
     | 'v' :: rem ->
-	T_variant, rem
+        T_variant, rem
     | 'a' :: rem ->
-	let t, rem = get_complete_type rem true in
-	  (T_array t), rem
+        let t, rem = get_complete_type rem true in
+          (T_array t), rem
     | '(' :: rem ->
         get_struct_type rem
     | ('{' as c) :: rem ->
@@ -171,7 +173,7 @@ let rec get_complete_type clist in_array =
 and get_struct_type clist =
   let rec helper acc = function
     | [] ->
-	raise_sig_error Sig_incomplete
+        raise_sig_error Sig_incomplete
     | ')' :: rem ->
         acc, rem
     | clist ->
@@ -202,19 +204,19 @@ let signature_of_string s =
 
 let signature_of_types tlist =
   let rec sig_one = function
-    | T_base B_byte        -> "y"
-    | T_base B_boolean     -> "b"
-    | T_base B_int16       -> "n"
-    | T_base B_uint16      -> "q"
-    | T_base B_int32       -> "i"
-    | T_base B_uint32      -> "u"
-    | T_base B_int64       -> "x"
-    | T_base B_uint64      -> "t"
-    | T_base B_double      -> "d"
-    | T_base B_string      -> "s"
-    | T_base B_object_path -> "o"
-    | T_base B_signature   -> "g"
-    | T_variant            -> "v"
+    | T_base B_byte         -> "y"
+    | T_base B_boolean      -> "b"
+    | T_base B_int16        -> "n"
+    | T_base B_uint16       -> "q"
+    | T_base B_int32        -> "i"
+    | T_base B_uint32       -> "u"
+    | T_base B_int64        -> "x"
+    | T_base B_uint64       -> "t"
+    | T_base B_double       -> "d"
+    | T_base B_string       -> "s"
+    | T_base B_object_path  -> "o"
+    | T_base B_signature    -> "g"
+    | T_variant             -> "v"
     | T_array t ->
         "a" ^ (match as_dict_entry t with
                  | Some (k, v) -> "{" ^ sig_one k ^ sig_one v ^ "}"

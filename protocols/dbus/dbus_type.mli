@@ -52,6 +52,7 @@ type sig_error =
   | Sig_incomplete
   | Sig_invalid of string
   | Sig_invalid_char of char
+  | Sig_not_nul_terminated
 
 val sig_error_message : sig_error -> string
 
