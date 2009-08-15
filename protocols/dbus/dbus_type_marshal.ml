@@ -48,28 +48,25 @@ let rec compute_marshaled_size ~stream_offset t v =
             then raise_error Signature_too_long
             else padding + 1 + String.length s + 1
       | T.T_array te, V.V_array va ->
-          let start_offset = stream_offset in
           let offset = stream_offset + padding + 4 in
           let end_offset =
             Array.fold_left (fun stream_offset ve ->
-                               offset + compute_marshaled_size ~stream_offset te ve
+                                 offset + compute_marshaled_size ~stream_offset te ve
                             ) offset va
-          in end_offset - start_offset
+          in end_offset - stream_offset
       | T.T_struct tl, V.V_struct vl ->
-          let start_offset = stream_offset in
-          let offset = start_offset + padding in
+          let offset = stream_offset + padding in
           let end_offset =
             List.fold_left2 (fun stream_offset t v ->
                                offset + compute_marshaled_size ~stream_offset t v
                             ) offset tl vl
-          in end_offset - start_offset
-      | _, V.V_variant (t, v) ->
-          let start_offset = stream_offset in
-          let sig_size = (compute_marshaled_size ~stream_offset
-                            (T.T_base T.B_signature) (V.V_signature [ t ])) in
-          let offset = start_offset + sig_size in
+          in end_offset - stream_offset
+      | T.T_variant, V.V_variant (t, v) ->
+          let offset = stream_offset + padding in
+          let offset = offset + (compute_marshaled_size ~stream_offset:offset
+                                   (T.T_base T.B_signature) (V.V_signature [ t ]))) in
           let offset = offset + compute_marshaled_size ~stream_offset:offset t v
-          in offset - start_offset
+          in offset - stream_offset
       | _ ->
           (* We should never reach here after the type_check in the first line. *)
         assert false
@@ -77,8 +74,8 @@ let rec compute_marshaled_size ~stream_offset t v =
 let compute_payload_marshaled_size ~stream_offset tlist vlist =
   V.type_check_args tlist vlist;
   List.fold_left2 (fun offset t v ->
-                     offset + compute_marshaled_size ~stream_offset t v
-                  ) stream_offset tlist vlist
+                       offset + compute_marshaled_size ~stream_offset t v
+                    ) stream_offset tlist vlist
 
 type context = {
   endian : T.endian;
@@ -99,8 +96,11 @@ let init_context ~stream_offset endian buffer  ~offset ~length =
     current_buffer_offset  = offset;
   }
 
-let get_marshalled_size ctxt =
+let get_marshaled_size ctxt =
   ctxt.current_buffer_offset - ctxt.starting_buffer_offset
+
+let get_current_stream_offset ctxt =
+  ctxt.starting_stream_offset + (get_marshaled_size ctxt)
 
 let advance ctxt nbytes =
   assert (ctxt.length >= nbytes);
@@ -110,8 +110,7 @@ let advance ctxt nbytes =
   }
 
 let check_and_align_context ctxt ~align ~size dtype =
-  let current_stream_offset = ctxt.starting_stream_offset + (get_marshalled_size ctxt) in
-  let padding = T.get_padding ~offset:current_stream_offset ~align in
+  let padding = T.get_padding ~offset:(get_current_stream_offset ctxt) ~align in
     if ctxt.length < padding + size then
       raise_error (Insufficient_space dtype);
     advance ctxt padding
@@ -310,7 +309,7 @@ let rec marshal_complete_type ctxt t v =
           List.fold_left2 (fun ctxt t v ->
                              marshal_complete_type ctxt t v
                           ) ctxt tl vl
-    | _, V.V_variant (t, v) ->
+    | T.T_variant, V.V_variant (t, v) ->
         let ctxt = marshal_signature ctxt (V.V_signature [ t ]) in
           marshal_complete_type ctxt t v
     | _ ->

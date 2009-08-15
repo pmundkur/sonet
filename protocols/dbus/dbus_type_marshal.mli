@@ -24,10 +24,13 @@ exception Marshal_error of error
 type context
 
 val init_context : stream_offset:int -> Dbus_type.endian -> string -> offset:int -> length:int -> context
-val get_marshalled_size : context -> int
+val get_marshaled_size : context -> int
+val get_current_stream_offset : context -> int
 
 val compute_marshaled_size : stream_offset:int -> Dbus_type.t -> Dbus_value.t -> int
 val compute_payload_marshaled_size : stream_offset:int -> Dbus_type.t list -> Dbus_value.t list -> int
+
+val advance : context -> int -> context
 
 val marshal_byte : context -> Dbus_value.t -> context
 val marshal_uint32 : context -> Dbus_value.t -> context
