@@ -66,14 +66,20 @@ let init_context endian buffer ~offset:offset ~length:length = {
   starting_offset = offset;
 }
 
+let num_parsed_bytes ctxt =
+  ctxt.offset - ctxt.starting_offset
+
+let num_remaining_bytes ctxt =
+  ctxt.length
+
+let num_alignment_bytes ctxt ~align =
+  T.get_padding ~offset:ctxt.offset ~align
+
 let append_bytes ctxt str ~offset:ofs ~length:len =
   { ctxt with
       buffer = ctxt.buffer ^ (String.sub str ofs len);
       length = ctxt.length + len;
   }
-
-let num_parsed_bytes ctxt =
-  ctxt.offset - ctxt.starting_offset
 
 let advance ctxt nbytes =
   assert (ctxt.length >= nbytes);
@@ -90,7 +96,7 @@ let rewind ctxt nbytes =
   }
 
 let check_and_align_context ctxt ~align ~size dtype =
-  let padding = T.get_padding ~offset:ctxt.offset ~align in
+  let padding = num_alignment_bytes ctxt ~align in
     if ctxt.length < padding + size then
       raise_error (Insufficient_data (dtype, ctxt.length, padding + size));
     advance ctxt padding
@@ -230,7 +236,7 @@ let check_valid_string ?(dtype=T.T_base T.B_string) s =
 let take_string ?(dtype=T.T_base T.B_string) ctxt =
   let len, ctxt = take_uint32 ~dtype ctxt in
   let len = Int64.to_int len in
-  (* the below call is only to check the length, since we're already aligned. *)
+    (* the below call is only to check the length, since we're already aligned. *)
   let ctxt = check_and_align_context ctxt ~align:1 ~size:(len + 1) dtype in
   let s = String.sub ctxt.buffer ctxt.offset len in
     check_valid_string ~dtype s;

@@ -35,8 +35,11 @@ type context
 
 val init_context : Dbus_type.endian -> string -> offset:int -> length:int -> context
 
-val append_bytes : context -> string -> offset:int -> length:int -> context
 val num_parsed_bytes : context -> int
+val num_remaining_bytes : context -> int
+val num_alignment_bytes : context -> align:int -> int
+
+val append_bytes : context -> string -> offset:int -> length:int -> context
 val advance : context -> int -> context
 val rewind : context -> int -> context
 val check_and_align_context : context -> align:int -> size:int -> Dbus_type.t -> context

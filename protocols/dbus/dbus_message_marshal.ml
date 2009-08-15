@@ -90,6 +90,7 @@ let marshal_message ~stream_offset endian buffer ~offset ~length m =
   let ctxt = P.marshal_byte ctxt (V.V_byte Protocol.protocol_version) in
   let signature, payload = M.get_signature m, M.get_payload m in
   let stream_offset = stream_offset + P.get_marshaled_size ctxt in
+  let stream_offset = stream_offset + T.get_padding ~offset:stream_offset ~align:8 in
   let payload_length = P.compute_payload_marshaled_size ~stream_offset signature payload in
   let ctxt = P.marshal_uint32 ctxt (V.V_uint32 (Int64.of_int payload_length)) in
   let ctxt = P.marshal_uint32 ctxt (V.V_uint32 (M.get_serial m)) in

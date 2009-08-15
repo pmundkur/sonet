@@ -23,11 +23,12 @@ module M = Dbus_message
 
 type fixed_header = {
   fixed_buffer : string;
-  start_offset : int;
+  fixed_start_offset : int;
   mutable offset: int;
 }
 
 type context = {
+  start_offset : int;
   buffer : Buffer.t;
   mutable type_context : P.context;
   mutable msg_type : M.msg_type;
@@ -35,7 +36,6 @@ type context = {
   mutable flags : M.flag list;
   mutable protocol_version : char;
   mutable serial : int64;
-  mutable bytes_remaining : int;
   mutable headers : (M.header * (T.t * V.t)) list;
   mutable signature : T.t list;
   mutable payload : V.t list;
@@ -43,8 +43,14 @@ type context = {
 
 type state =
   | In_fixed_header of fixed_header
-  | In_headers of context
-  | In_payload of context
+  | In_headers of
+      (* bytes remaining *) int *
+      context
+  | In_padding of
+      (* padding bytes remaining *) int *
+      context
+  | In_payload of
+      (* bytes remaining *) int * context
 
 type parse_result =
   | Parse_incomplete of state
@@ -92,13 +98,14 @@ let init_state start_offset =
   let buffer = String.make length '\x00' in
     In_fixed_header {
       fixed_buffer = buffer;
-      start_offset = start_offset;
+      fixed_start_offset = start_offset;
       offset = start_offset;
     }
 
-let init_context type_context msg_type payload_length flags protocol_version
+let init_context start_offset type_context msg_type payload_length flags protocol_version
     serial bytes_remaining =
   {
+    start_offset = start_offset;
     buffer = Buffer.create bytes_remaining;
     type_context = type_context;
     msg_type = msg_type;
@@ -106,7 +113,6 @@ let init_context type_context msg_type payload_length flags protocol_version
     flags = flags;
     protocol_version = protocol_version;
     serial = serial;
-    bytes_remaining = bytes_remaining;
     headers = [];
     signature = [];
     payload = [];
@@ -245,28 +251,29 @@ let make_message ctxt =
 
 (* See the documentation for init_state. *)
 let process_fixed_header fh =
-  let endian = fh.fixed_buffer.[fh.start_offset] in
+  let endian = fh.fixed_buffer.[fh.fixed_start_offset] in
   let endian =
     if endian = Protocol.little_endian then T.Little_endian
     else if endian = Protocol.big_endian then T.Big_endian
     else raise_error Invalid_endian in
   let tctxt = (P.init_context endian fh.fixed_buffer
-                 ~offset:(fh.start_offset + 1)
-                 ~length:((String.length fh.fixed_buffer) - fh.start_offset - 1)) in
+                 ~offset:(fh.fixed_start_offset + 1)
+                 ~length:((String.length fh.fixed_buffer) - fh.fixed_start_offset - 1)) in
   let msg_type, tctxt = P.take_byte tctxt in
   let msg_type = parse_msg_type msg_type in
   let flags, tctxt = P.take_byte tctxt in
   let flags = parse_flags flags in
   let protocol_version, tctxt = P.take_byte tctxt in
-  let tctxt = P.check_and_align_context tctxt ~align:4 ~size:(3 * 4) (T.T_base T.B_uint32) in
   let payload_length, tctxt = P.take_uint32 tctxt in
   let serial, tctxt = P.take_uint32 tctxt in
     (* The remaining bytes are the bytes in the header array data.  We
        won't update our type_parsing context 'tctxt' now; since we
        need it to parse the array once we get the array data. *)
   let bytes_remaining, _ = P.take_uint32 tctxt in
-    init_context tctxt msg_type (Int64.to_int payload_length) flags
-      protocol_version serial (Int64.to_int bytes_remaining)
+  let bytes_remaining = Int64.to_int bytes_remaining in
+    bytes_remaining, (init_context fh.fixed_start_offset
+                        tctxt msg_type (Int64.to_int payload_length) flags
+                        protocol_version serial bytes_remaining)
 
 let unpack_headers hdr_array =
   (* hdr_array is an array of byte-indexed dict_entries (structs); we
@@ -279,9 +286,9 @@ let unpack_headers hdr_array =
                           let hv = List.nth hv 1 in
                             (C.to_byte hb, C.to_variant hv)
                        ) hl in
-  (* For now, we just look up the known standard headers; we could
-     store the unknown headers too in the message if we really need
-     them. *)
+    (* For now, we just look up the known standard headers; we could
+       store the unknown headers too in the message if we really need
+       them. *)
   let headers =
     List.map (fun (hdr_code, hdr_type, hdr) ->
                 try
@@ -297,36 +304,37 @@ let unpack_headers hdr_array =
 let process_headers ctxt =
   let tctxt = (P.append_bytes ctxt.type_context
                  (Buffer.contents ctxt.buffer) 0 (Buffer.length ctxt.buffer)) in
-  (* At this point, the parsing context is where process_fixed_header
-     left it, i.e. ready to parse the array. *)
+    (* At this point, the parsing context is where process_fixed_header
+       left it, i.e. ready to parse the array. *)
   let hdr_array, tctxt = P.parse_complete_type Protocol.hdr_array_type tctxt in
   let headers = unpack_headers hdr_array in
+    ctxt.headers <- headers;
+    ctxt.type_context <- tctxt;
     (* The header "array length does not include any padding after the
        last element"; however, "the header ends after its alignment
-       padding to an 8-boundary".  So, the latter alignment still
-       remains, and we perform it now. *)
-  let tctxt = P.check_and_align_context tctxt ~align:8 ~size:0 Protocol.hdr_array_type in
-    ctxt.type_context <- tctxt;
-    ctxt.headers <- headers;
-    (* We now prepare to read in the payload, if any. *)
-    ctxt.bytes_remaining <- ctxt.payload_length
+       padding to an 8-boundary".  We return the number of such
+       padding bytes expected, along with the payload length.
+    *)
+    (P.num_alignment_bytes tctxt ~align:8), ctxt
 
 let process_payload ctxt =
-  (* We have a payload, so we should have a signature header. *)
-  let _, sigval =
-    try List.assoc M.Hdr_signature ctxt.headers
-    with Not_found -> raise_error Missing_signature_header_for_payload in
-    (* For more informative error handling, we should also check that
-       the signature header has a signature-type; for now, we rely on
-       C.to_signature throwing a (less-informative) conversion
-       exception. *)
-  let signature = C.to_signature sigval in
-    (* The parsing context has already been adjusted for us in
-       process_headers, so we're ready to parse the payload. *)
-  let payload, tctxt = P.parse_type_list signature ctxt.type_context in
-    ctxt.signature <- signature;
-    ctxt.payload <- payload;
-    ctxt.type_context <- tctxt
+  if ctxt.payload_length > 0 then begin
+    (* We have a payload, so we should have a signature header. *)
+    let _, sigval =
+      try List.assoc M.Hdr_signature ctxt.headers
+      with Not_found -> raise_error Missing_signature_header_for_payload in
+      (* For more informative error handling, we should also check
+         that the signature header has a signature-type; for now, we
+         rely on C.to_signature throwing a (less-informative)
+         conversion exception. *)
+    let signature = C.to_signature sigval in
+      (* The parsing context has already been adjusted for us in
+         process_headers, so we're ready to parse the payload. *)
+    let payload, tctxt = P.parse_type_list signature ctxt.type_context in
+      ctxt.signature <- signature;
+      ctxt.payload <- payload;
+      ctxt.type_context <- tctxt
+  end
 
 let rec parse_substring state str ofs len =
   match state with
@@ -336,35 +344,39 @@ let rec parse_substring state str ofs len =
           String.blit str ofs fh.fixed_buffer fh.offset bytes_to_consume;
           fh.offset <- fh.offset + bytes_to_consume;
           if bytes_to_consume < fh_bytes_remaining
-            then Parse_incomplete (In_fixed_header fh)
-            else begin
-              let ctxt = process_fixed_header fh in
-                if ctxt.bytes_remaining = 0
-                then Parse_result (make_message ctxt, len - bytes_to_consume)
-                else (parse_substring (In_headers ctxt)
-                        str (ofs + bytes_to_consume) (len - bytes_to_consume))
-            end
-    | In_headers ctxt ->
-        let bytes_to_consume = min len ctxt.bytes_remaining in
+          then Parse_incomplete (In_fixed_header fh)
+          else
+            let bytes_remaining, ctxt = process_fixed_header fh in
+              parse_substring (In_headers (bytes_remaining, ctxt))
+                str (ofs + bytes_to_consume) (len - bytes_to_consume)
+    | In_headers (bytes_remaining, ctxt) ->
+        let bytes_to_consume = min len bytes_remaining in
+        let bytes_remaining = bytes_remaining - bytes_to_consume in
           Buffer.add_substring ctxt.buffer str ofs bytes_to_consume;
-          ctxt.bytes_remaining <- ctxt.bytes_remaining - bytes_to_consume;
-          if ctxt.bytes_remaining > 0
-          then Parse_incomplete (In_headers ctxt)
-          else begin
-            process_headers ctxt;
-            (* We need to check again to see if we expect a payload. *)
-            if ctxt.bytes_remaining = 0
-            then Parse_result (make_message ctxt, len - bytes_to_consume)
-            else (parse_substring (In_payload ctxt)
-                    str (ofs + bytes_to_consume) (len - bytes_to_consume))
-          end
-    | In_payload ctxt ->
-        let bytes_to_consume = min len ctxt.bytes_remaining in
+          if bytes_remaining > 0
+          then Parse_incomplete (In_headers (bytes_remaining, ctxt))
+          else
+            let padding_bytes_remaining, ctxt = process_headers ctxt in
+              parse_substring (In_padding (padding_bytes_remaining, ctxt))
+                str (ofs + bytes_to_consume) (len - bytes_to_consume)
+    | In_padding (bytes_remaining, ctxt) ->
+        let bytes_to_consume = min len bytes_remaining in
+        let bytes_remaining = bytes_remaining - bytes_to_consume in
+        let tctxt = P.append_bytes ctxt.type_context str ofs bytes_to_consume in
+        let tctxt = P.advance tctxt bytes_to_consume in
+          ctxt.type_context <- tctxt;
+          if bytes_remaining > 0
+          then Parse_incomplete (In_padding (bytes_remaining, ctxt))
+          else
+            parse_substring (In_payload (ctxt.payload_length, ctxt))
+              str (ofs + bytes_to_consume) (len - bytes_to_consume)
+    | In_payload (bytes_remaining, ctxt) ->
+        let bytes_to_consume = min len bytes_remaining in
+        let bytes_remaining = bytes_remaining - bytes_to_consume in
         let tctxt = P.append_bytes ctxt.type_context str ofs bytes_to_consume in
           ctxt.type_context <- tctxt;
-          ctxt.bytes_remaining <- ctxt.bytes_remaining - bytes_to_consume;
-          if ctxt.bytes_remaining > 0
-          then Parse_incomplete (In_payload ctxt)
+          if bytes_remaining > 0
+          then Parse_incomplete (In_payload (bytes_remaining, ctxt))
           else begin
             process_payload ctxt;
             Parse_result (make_message ctxt, len - bytes_to_consume)
