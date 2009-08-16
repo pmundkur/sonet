@@ -172,7 +172,10 @@ let get_headers m =
       | Msg_method_call mc -> [
           Hdr_path, (T.T_base T.B_object_path, V.V_object_path mc.method_call_path);
           Hdr_member, (T.T_base T.B_string, V.V_string mc.method_call_member);
-        ]
+        ] @ (match mc.method_call_interface with
+               | None   -> []
+               | Some i -> [ Hdr_interface, (T.T_base T.B_string, V.V_string i) ]
+            )
       | Msg_method_return mr -> [
           Hdr_reply_serial, (T.T_base T.B_uint32, V.V_uint32 mr.method_return_reply_serial);
         ]
