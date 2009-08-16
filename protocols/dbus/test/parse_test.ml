@@ -15,6 +15,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module T = Dbus_type
+module V = Dbus_value
+
 let serial = ref 0L
 
 let get_serial () =
@@ -40,8 +43,8 @@ let get_msgs () =
                ~destination ~serial:(get_serial ())
                ~interface ~property);
 
-    let val_type    = Dbus_type.T_base Dbus_type.B_string in
-    let value       = Dbus_value.V_string "string" in
+    let val_type    = T.T_base T.B_string in
+    let value       = V.V_string "string" in
     add_msg (Dbus_msglib.make_property_set_msg
                ~destination ~serial:(get_serial ())
                ~interface ~property ~val_type ~value);
@@ -99,7 +102,7 @@ let marshal_msgs endian msgs =
                    ) (0, total_len) msgs
   in buf, final_ofs, remaining
 
-let test verbose tracing endian =
+let test_msg_roundtrip verbose tracing endian =
   let result = ref true in
   let test_msgs = get_msgs () in
   let buf, final_ofs, remaining = marshal_msgs endian test_msgs in
@@ -141,6 +144,63 @@ let test verbose tracing endian =
                  ) test_msgs parsed_msgs;
       !result
 
+let get_values () = [
+  T.T_base T.B_string, V.V_string "test string";
+  T.T_base T.B_uint32, V.V_uint32 (Int64.of_int (1056*256));
+  (T.T_array (T.T_array (T.T_base T.B_string)),
+   V.V_array [| V.V_array [| V.V_string "string11"; V.V_string "string12" |];
+                V.V_array [| V.V_string "string21"; V.V_string "string22" |];
+                V.V_array [| V.V_string "string31"; V.V_string "string32" |]
+             |]);
+  T.T_base T.B_double, V.V_double 1.0;
+]
+
+let marshal_types endian values =
+  let len =
+    (List.fold_left (fun ofs (t,v) ->
+                       ofs + (Dbus_type_marshal.compute_marshaled_size
+                                ~stream_offset:ofs t v)
+                    ) 0 values) in
+  let buf = String.make len 'P' in
+  let total_len = String.length buf in
+  let ctxt = (Dbus_type_marshal.init_context endian buf
+                ~stream_offset:0 ~offset:0 ~length:total_len) in
+  let _ =
+    List.fold_left (fun ctxt (t, v) ->
+                      Dbus_type_marshal.marshal_complete_type ctxt t v
+                   ) ctxt values
+  in buf
+
+let parse_types endian types buf =
+  let ctxt = (Dbus_type_parse.init_context endian buf
+                ~offset:0 ~length:(String.length buf)) in
+  let _, values =
+    List.fold_left (fun (ctxt, values) t ->
+                      let v, ctxt = Dbus_type_parse.parse_complete_type t ctxt in
+                        ctxt, v :: values
+                   ) (ctxt, []) types
+  in List.rev values
+
+let test_value_roundtrip verbose tracing endian =
+  let result = ref true in
+  let mvalues = get_values () in
+  let types = List.map (fun (t, _) -> t) mvalues in
+  let buf = marshal_types endian mvalues in
+  let pvalues = parse_types endian types buf in
+    List.iter2 (fun (t, mv) pv ->
+                  result := !result && mv = pv;
+                  if verbose then begin
+                    Printf.printf "\nTest: type=%s\n" (T.to_string t);
+                    Printf.printf "\t-> %s\n" (V.to_string mv);
+                    Printf.printf "\t<- %s\n" (V.to_string pv);
+                  end else if mv <> pv then begin
+                    Printf.printf "\nFailed Test: type=%s\n" (T.to_string t);
+                    Printf.printf "\t -> %s\n" (V.to_string mv);
+                    Printf.printf "\t <- %s\n" (V.to_string pv);
+                  end
+               ) mvalues pvalues;
+    !result
+
 let print_except e bt =
   Printf.printf "Exception: %s\n" e;
   Printf.printf "%s\n" bt
@@ -165,8 +225,10 @@ let _ =
     end;
 
     try
-      if not (test !verbose !tracing Dbus_type.Little_endian) then
-        exit 1
+      if not (test_msg_roundtrip !verbose !tracing T.Little_endian) then
+        exit 1;
+      if not (test_value_roundtrip !verbose !tracing T.Little_endian) then
+        exit 1;
     with
       | Dbus_type_marshal.Marshal_error e ->
           print_except (Dbus_type_marshal.error_message e) (Printexc.get_backtrace ())
