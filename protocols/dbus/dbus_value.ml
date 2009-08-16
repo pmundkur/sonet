@@ -205,7 +205,6 @@ let rec type_check t v =
     | T.T_array t, V_array va ->
         Array.iter (type_check t) va
     | T.T_struct tl, V_struct vl ->
-        (* TODO: In what cases would we get mismatched lengths? *)
         type_check_args tl vl
     | t, v ->
         raise_type_check_error (Type_mismatch (t, v))

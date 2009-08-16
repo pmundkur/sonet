@@ -274,9 +274,10 @@ let marshal_double ctxt v =
 
 let put_string ?(dtype=T.T_base T.B_string) ctxt s =
   let slen = String.length s in
-    (* TODO: fix so that we can check_context for appropriate size *)
   let ctxt = (put_u32 ~dtype:(T.T_base T.B_string) ctxt
                 (from_uint32 ctxt.endian (Int64.of_int slen))) in
+    if ctxt.length < slen then
+      raise_error (Insufficient_space dtype);
     String.blit s 0 ctxt.buffer ctxt.current_buffer_offset slen;
     let ctxt = advance ctxt slen in
       put_byte ctxt '\x00'
