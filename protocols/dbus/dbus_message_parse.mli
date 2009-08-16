@@ -38,3 +38,5 @@ type parse_result =
   | Parse_result of Dbus_message.t * (* unconsumed bytes *) int
 
 val parse_substring : state -> string -> int -> int -> parse_result
+
+val enable_debug_log : unit -> unit

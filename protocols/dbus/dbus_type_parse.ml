@@ -19,6 +19,15 @@ module T = Dbus_type
 module V = Dbus_value
 module C = Dbus_conv
 
+let verbose = ref false
+
+let dbg fmt =
+  let logger s = if !verbose then Printf.printf "%s\n%!" s
+  in Printf.ksprintf logger fmt
+
+let enable_debug_log () =
+  verbose := true
+
 type inv_reason =
   | Inv_non_boolean
   | Inv_string of V.string_error
@@ -294,6 +303,8 @@ let get_base_parser = function
   | T.B_signature ->    parse_signature
 
 let rec parse_complete_type dtype ctxt =
+  dbg " [parse_complete_type (entry): start-ofs=%d type=%s"
+    ctxt.offset (T.to_string dtype);
   let v, ctxt' =
     match dtype with
       | T.T_base b ->
@@ -338,6 +349,8 @@ let rec parse_complete_type dtype ctxt =
             V.V_struct vl, ctxt
   in
     V.type_check dtype v;
+    dbg " [parse_complete_type  (exit): start-ofs=%d end-ofs=%d size=%d type=%s val=%s"
+      ctxt.offset ctxt'.offset (ctxt'.offset - ctxt.offset) (T.to_string dtype) (V.to_string v);
     v, ctxt'
 
 and parse_type_list dtypes ctxt =

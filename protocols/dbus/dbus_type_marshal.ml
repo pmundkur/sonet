@@ -19,6 +19,15 @@ module T = Dbus_type
 module V = Dbus_value
 module C = Dbus_conv
 
+let verbose = ref false
+
+let dbg fmt =
+  let logger s = if !verbose then Printf.printf "%s\n%!" s
+  in Printf.ksprintf logger fmt
+
+let enable_debug_log () =
+  verbose := true
+
 type error =
   | Signature_too_long
   | Insufficient_space of T.t
@@ -34,6 +43,7 @@ let raise_error e =
 let rec compute_marshaled_size ~stream_offset t v =
   V.type_check t v;
   let padding = T.get_padding ~offset:stream_offset ~align:(T.alignment_of t) in
+  let size =
     match t, v with
       | _, V.V_byte _         -> padding + 1
       | _, V.V_boolean _      -> padding + 4
@@ -75,6 +85,10 @@ let rec compute_marshaled_size ~stream_offset t v =
       | _ ->
           (* We should never reach here after the type_check in the first line. *)
           assert false
+  in
+    dbg " [compute_marshaled_size: ofs=%d size=%d type=%s val=%s"
+      stream_offset size (T.to_string t) (V.to_string v);
+    size
 
 let compute_payload_marshaled_size ~stream_offset tlist vlist =
   V.type_check_args tlist vlist;
@@ -302,6 +316,7 @@ let get_base_marshaler = function
 
 let rec marshal_complete_type ctxt t v =
   V.type_check t v;
+  let ctxt' =
   match t, v with
     | T.T_base b, _ ->
         (get_base_marshaler b) ctxt v
@@ -346,6 +361,12 @@ let rec marshal_complete_type ctxt t v =
     | _ ->
         (* We should never reach here after the type_check in the first line. *)
         assert false
+  in
+    dbg " [marshal_complete_type: ofs=%d size=%d type=%s value=%s"
+      (get_current_stream_offset ctxt)
+      ((get_marshaled_size ctxt') - (get_marshaled_size ctxt))
+      (T.to_string t) (V.to_string v);
+    ctxt'
 
 let marshal_payload ctxt tlist vlist =
   V.type_check_args tlist vlist;

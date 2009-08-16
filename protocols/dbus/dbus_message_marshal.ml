@@ -21,6 +21,15 @@ module C = Dbus_conv
 module P = Dbus_type_marshal
 module M = Dbus_message
 
+let verbose = ref false
+
+let dbg fmt =
+  let logger s = if !verbose then Printf.printf "%s\n%!" s
+  in Printf.ksprintf logger fmt
+
+let enable_debug_log () =
+  verbose := true
+
 exception Header_not_found of M.header
 
 let pack_headers hdrs =
@@ -66,10 +75,16 @@ let compute_marshaled_size stream_offset m =
      in a single buffer. If the header does not naturally end on an
      8-byte boundary up to 7 bytes of nul-initialized alignment padding
      must be added." *)
-  let offset = offset + (T.get_padding ~offset ~align:8) in
+  let padding = T.get_padding ~offset ~align:8 in
+  let offset = offset + padding in
   let signature, payload = M.get_signature m, M.get_payload m in
-  let offset = offset + P.compute_payload_marshaled_size ~stream_offset:offset signature payload
-  in offset - stream_offset
+  let payload_length = P.compute_payload_marshaled_size ~stream_offset:offset signature payload in
+  let offset = offset + payload_length in
+  let size = offset - stream_offset
+  in
+    dbg "[dbus_message_marshal] compute_marshaled_size: ofs=%d post_header_padding=%d payload=%d size=%d"
+      stream_offset padding payload_length size;
+    size
 
 let get_message_type_code = function
   | M.Msg_method_call _   -> Char.chr Protocol.method_call_msg
@@ -98,7 +113,13 @@ let marshal_message ~stream_offset endian buffer ~offset ~length m =
                 (pack_headers (M.get_headers m))) in
     (* Align the payload body on a 8-byte boundary; see comment in
        compute_marshaled_size. *)
-  let ctxt = P.advance ctxt (T.get_padding ~offset:(P.get_current_stream_offset ctxt) ~align:8) in
+  let padding = T.get_padding ~offset:(P.get_current_stream_offset ctxt) ~align:8 in
+  let ctxt = P.advance ctxt padding in
   let ctxt = P.marshal_payload ctxt signature payload in
+  let size =
     1 (* the endian byte was marshaled outside the context *) + P.get_marshaled_size ctxt
+  in
+    dbg "[marshal_message: stream_offset=%d ofs=%d len=%d post_header_padding=%d payload=%d size=%d"
+      stream_offset offset length padding payload_length size;
+    size
 
