@@ -18,6 +18,17 @@
 module T = Dbus_type
 module V = Dbus_value
 
+let platform_test () =
+  (match Platform.get_host_endianness () with
+     | Platform.Little_endian -> Printf.printf "Platform is little-endian.\n"
+     | Platform.Big_endian    -> Printf.printf "Platform is big-endian.\n");
+  let doubles = [3.0; 30003.3333] in
+    List.iter (fun d ->
+		let da = Platform.float_to_bytes d in
+		let d' = Platform.float_of_bytes da in
+		  Printf.printf " %f -> %f\n" d d'
+	     ) doubles
+
 let serial = ref 0L
 
 let get_serial () =
@@ -225,6 +236,7 @@ let _ =
     end;
 
     try
+      platform_test ();
       if not (test_msg_roundtrip !verbose !tracing T.Little_endian) then
         exit 1;
       if not (test_value_roundtrip !verbose !tracing T.Little_endian) then
