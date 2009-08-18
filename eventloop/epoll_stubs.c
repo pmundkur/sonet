@@ -87,10 +87,11 @@ void raise_unix_error(int errnum, char *fn_name, char *fn_param) {
     int i;
 
     static value *caml_unix_exc_constr = NULL;
-    if (NULL == caml_unix_exc_constr)
+    if (NULL == caml_unix_exc_constr) {
         caml_unix_exc_constr = caml_named_value(UNIX_EXCEPTION_NAME);
-    if (NULL == caml_unix_exc_constr)
-        invalid_argument("Exception Unix.Unix_error not initialized, please link unix.cma");
+        if (NULL == caml_unix_exc_constr)
+            invalid_argument("Exception Unix.Unix_error not initialized, please link unix.cma");
+    }
 
     v_fn_name = (NULL == fn_name) ? Atom(String_tag) : caml_copy_string(fn_name);
     v_fn_param = (NULL == fn_param) ? Atom(String_tag) : caml_copy_string(fn_param);
