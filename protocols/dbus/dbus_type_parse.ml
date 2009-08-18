@@ -285,8 +285,29 @@ let parse_double ctxt =
   let dtype = T.T_base T.B_double in
   let align = T.alignment_of dtype in
   let ctxt = check_and_align_context ctxt ~align ~size:8 dtype in
-    (* TODO: Do it in C, or better yet, with some Oo.black magic. *)
-    V.V_double 0.0, advance ctxt 8
+  let db = Array.make 8 '\000' in
+    (match Platform.get_host_endianness (), ctxt.endian with
+       | Platform.Little_endian, T.Little_endian
+       | Platform.Big_endian, T.Big_endian ->
+           db.(0) <- ctxt.buffer.[ctxt.offset];
+           db.(1) <- ctxt.buffer.[ctxt.offset + 1];
+           db.(2) <- ctxt.buffer.[ctxt.offset + 2];
+           db.(3) <- ctxt.buffer.[ctxt.offset + 3];
+           db.(4) <- ctxt.buffer.[ctxt.offset + 4];
+           db.(5) <- ctxt.buffer.[ctxt.offset + 5];
+           db.(6) <- ctxt.buffer.[ctxt.offset + 6];
+           db.(7) <- ctxt.buffer.[ctxt.offset + 7]
+       | _ ->
+           db.(0) <- ctxt.buffer.[ctxt.offset + 7];
+           db.(1) <- ctxt.buffer.[ctxt.offset + 6];
+           db.(2) <- ctxt.buffer.[ctxt.offset + 5];
+           db.(3) <- ctxt.buffer.[ctxt.offset + 4];
+           db.(4) <- ctxt.buffer.[ctxt.offset + 3];
+           db.(5) <- ctxt.buffer.[ctxt.offset + 2];
+           db.(6) <- ctxt.buffer.[ctxt.offset + 1];
+           db.(7) <- ctxt.buffer.[ctxt.offset]
+    );
+    V.V_double (Platform.float_of_bytes db), advance ctxt 8
 
 let get_base_parser = function
   | T.B_byte ->         parse_byte

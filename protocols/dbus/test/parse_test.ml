@@ -24,10 +24,10 @@ let platform_test () =
      | Platform.Big_endian    -> Printf.printf "Platform is big-endian.\n");
   let doubles = [3.0; 30003.3333] in
     List.iter (fun d ->
-		let da = Platform.float_to_bytes d in
-		let d' = Platform.float_of_bytes da in
-		  Printf.printf " %f -> %f\n" d d'
-	     ) doubles
+                let da = Platform.float_to_bytes d in
+                let d' = Platform.float_of_bytes da in
+                  assert (d = d')
+             ) doubles
 
 let serial = ref 0L
 
@@ -164,6 +164,7 @@ let get_values () = [
                 V.V_array [| V.V_string "string31"; V.V_string "string32" |]
              |]);
   T.T_base T.B_double, V.V_double 1.0;
+  T.T_base T.B_double, V.V_double 33033.0333;
 ]
 
 let marshal_types endian values =

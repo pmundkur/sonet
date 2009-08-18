@@ -267,10 +267,32 @@ let marshal_uint64 ctxt v =
     put_u64 ~dtype:(T.T_base T.B_uint64) ctxt (from_uint64 ctxt.endian i)
 
 let marshal_double ctxt v =
-  (* TODO: via C or Oo.magic? *)
-  let d = C.to_double v in
-    ignore d;
-    ctxt
+  let dtype = T.T_base T.B_double in
+  let align = T.alignment_of dtype in
+  let ctxt = check_and_align_context ctxt ~align ~size:8 dtype in
+  let db = Platform.float_to_bytes (C.to_double v) in
+    (match Platform.get_host_endianness (), ctxt.endian with
+       | Platform.Little_endian, T.Little_endian
+       | Platform.Big_endian, T.Big_endian ->
+           ctxt.buffer.[ctxt.current_buffer_offset] <- db.(0);
+           ctxt.buffer.[ctxt.current_buffer_offset + 1] <- db.(1);
+           ctxt.buffer.[ctxt.current_buffer_offset + 2] <- db.(2);
+           ctxt.buffer.[ctxt.current_buffer_offset + 3] <- db.(3);
+           ctxt.buffer.[ctxt.current_buffer_offset + 4] <- db.(4);
+           ctxt.buffer.[ctxt.current_buffer_offset + 5] <- db.(5);
+           ctxt.buffer.[ctxt.current_buffer_offset + 6] <- db.(6);
+           ctxt.buffer.[ctxt.current_buffer_offset + 7] <- db.(7)
+       | _ ->
+           ctxt.buffer.[ctxt.current_buffer_offset] <- db.(7);
+           ctxt.buffer.[ctxt.current_buffer_offset + 1] <- db.(6);
+           ctxt.buffer.[ctxt.current_buffer_offset + 2] <- db.(5);
+           ctxt.buffer.[ctxt.current_buffer_offset + 3] <- db.(4);
+           ctxt.buffer.[ctxt.current_buffer_offset + 4] <- db.(3);
+           ctxt.buffer.[ctxt.current_buffer_offset + 5] <- db.(2);
+           ctxt.buffer.[ctxt.current_buffer_offset + 6] <- db.(1);
+           ctxt.buffer.[ctxt.current_buffer_offset + 7] <- db.(0)
+    );
+    advance ctxt 8
 
 let put_string ?(dtype=T.T_base T.B_string) ctxt s =
   let slen = String.length s in
