@@ -3,8 +3,21 @@ let system_sock_addr = "/home/prashanth/src/dbus/install-1.3.0/var/run/dbus/syst
 let session_sock_addr = "\000/tmp/dbus-mzDgLTknAW"
 let dbus_addr = session_sock_addr
 
-let auth_callback _ =
-  Printf.printf "Authenticated!\n%!"
+let serial = ref 0L
+
+let get_serial () =
+  let s = !serial in
+    serial := Int64.succ !serial;
+    s
+
+let get_hello_msg () =
+  Dbus_msglib.make_hello_msg ~serial:(get_serial ())
+
+let auth_callback conn =
+  Printf.printf "Authenticated!\n%!";
+  (* We need to register with the bus; i.e. send a Hello message.  The
+     response will contain our unique bus name.  *)
+  Dbus_connection.send conn (get_hello_msg ())
 
 let msg_received_callback _ _ =
   Printf.printf "Message received!\n%!"
@@ -39,8 +52,6 @@ let start_dbus_connection el dbus_addr =
 
 let run el =
   while Eventloop.has_connections el || Eventloop.has_timers el do
-    Printf.printf "%b connections, %b timers ...\n%!"
-      (Eventloop.has_connections el) (Eventloop.has_timers el);
     Eventloop.dispatch el 1.0
   done
 
