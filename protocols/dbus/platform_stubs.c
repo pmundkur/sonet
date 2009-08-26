@@ -37,7 +37,7 @@ int get_host_endianness(void) {
     uint64_t u64;
     unsigned const char *u;
 
-    u64 = 0x0001020304050607L;
+    u64 = 0x0001020304050607LL;
     u = (unsigned const char *) &u64;
 
     if (0x07 == u[0] && 0x06 == u[1] && 0x05 == u[2] && 0x04 == u[3]
