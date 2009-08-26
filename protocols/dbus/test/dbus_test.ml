@@ -3,7 +3,7 @@ let system_sock_addr = "/home/prashanth/src/dbus/install-1.3.0/var/run/dbus/syst
 let session_sock_addr = "\000/tmp/dbus-mzDgLTknAW"
 let dbus_addr = session_sock_addr
 
-let serial = ref 0L
+let serial = ref 1L
 
 let get_serial () =
   let s = !serial in
@@ -38,8 +38,8 @@ let start_dbus_connection el dbus_addr =
     Unix.set_nonblock sock;
     let connected =
       try
-	Unix.connect sock (Unix.ADDR_UNIX dbus_addr);
-	true
+        Unix.connect sock (Unix.ADDR_UNIX dbus_addr);
+        true
       with Unix.Unix_error (Unix.EAGAIN, _, _) -> false in
     let callbacks = {
       Dbus_connection.authenticated_callback = auth_callback;
@@ -55,11 +55,8 @@ let run el =
     Eventloop.dispatch el 1.0
   done
 
-let main () =
+let main dbus_addr =
   let el = Eventloop.create () in
-  let dbus_addr = (if Array.length Sys.argv = 1
-		   then system_sock_addr
-		   else "\000" ^ Sys.argv.(1)) in
   let _ = start_dbus_connection el dbus_addr
   in run el
 
@@ -69,11 +66,31 @@ let print_except e bt =
 
 let _ =
   Printexc.record_backtrace true;
+
+  let verbose = ref false in
+  let tracing = ref false in
+  let dbus_addr = ref "" in
+  let larg = [
+    ("-v", Arg.Set verbose, " verbose");
+    ("-t", Arg.Set tracing, " tracing");
+  ] in
+  let usage_msg = Printf.sprintf "%s [-v] [-t]" Sys.argv.(0) in
+    Arg.parse larg (fun s -> dbus_addr := s) usage_msg;
+
+    if !tracing then begin
+      Dbus_message_marshal.enable_debug_log ();
+      Dbus_type_marshal.enable_debug_log ();
+      Dbus_message_parse.enable_debug_log ();
+      Dbus_type_parse.enable_debug_log ();
+    end;
+
   try
-    main ()
+    main (if !dbus_addr = ""
+          then system_sock_addr
+          else "\000" ^ !dbus_addr)
   with
     | (Unix.Unix_error (ec, m, s) as e)->
-	Printf.printf "Unix error: %s (%s %s)\n" (Unix.error_message ec) m s;
-	print_except (Printexc.to_string e) (Printexc.get_backtrace ())
+        Printf.printf "Unix error: %s (%s %s)\n" (Unix.error_message ec) m s;
+        print_except (Printexc.to_string e) (Printexc.get_backtrace ())
     | e ->
-	print_except (Printexc.to_string e) (Printexc.get_backtrace ())
+        print_except (Printexc.to_string e) (Printexc.get_backtrace ())

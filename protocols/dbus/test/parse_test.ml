@@ -29,7 +29,7 @@ let platform_test () =
                   assert (d = d')
              ) doubles
 
-let serial = ref 0L
+let serial = ref 1L
 
 let get_serial () =
   let s = !serial in
