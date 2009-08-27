@@ -40,3 +40,7 @@ type parse_result =
 val parse_substring : state -> string -> int -> int -> parse_result
 
 val enable_debug_log : unit -> unit
+val disable_debug_log : unit -> unit
+
+val enable_data_trace : unit -> unit
+val disable_data_trace : unit -> unit

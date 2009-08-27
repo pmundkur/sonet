@@ -28,6 +28,9 @@ let dbg fmt =
 let enable_debug_log () =
   verbose := true
 
+let disable_debug_log () =
+  verbose := false
+
 type error =
   | Signature_too_long
   | Insufficient_space of T.t

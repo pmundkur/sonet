@@ -75,3 +75,4 @@ val parse_complete_type : Dbus_type.t -> context -> Dbus_value.t * context
 val parse_type_list : Dbus_type.t list -> context -> Dbus_value.t list * context
 
 val enable_debug_log : unit -> unit
+val disable_debug_log : unit -> unit

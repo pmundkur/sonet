@@ -28,6 +28,9 @@ let dbg fmt =
 let enable_debug_log () =
   verbose := true
 
+let disable_debug_log () =
+  verbose := false
+
 type inv_reason =
   | Inv_non_boolean
   | Inv_string of V.string_error

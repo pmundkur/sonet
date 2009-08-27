@@ -30,6 +30,9 @@ let dbg fmt =
 let enable_debug_log () =
   verbose := true
 
+let disable_debug_log () =
+  verbose := false
+
 exception Header_not_found of M.header
 
 let pack_headers hdrs =

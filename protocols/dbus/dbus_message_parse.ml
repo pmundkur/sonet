@@ -27,8 +27,23 @@ let dbg fmt =
   let logger s = if !verbose then Printf.printf "%s\n%!" s
   in Printf.ksprintf logger fmt
 
+let dbg_nonl fmt =
+  let logger s = if !verbose then Printf.printf "%s%!" s
+  in Printf.ksprintf logger fmt
+
 let enable_debug_log () =
   verbose := true
+
+let disable_debug_log () =
+  verbose := false
+
+let show_data = ref false
+
+let enable_data_trace () =
+  show_data := true
+
+let disable_data_trace () =
+  show_data := false
 
 type fixed_header = {
   fixed_buffer : string;
@@ -345,6 +360,15 @@ let process_payload ctxt =
       ctxt.type_context <- tctxt
   end
 
+let dbg_input str ofs len =
+  if !show_data then begin
+    dbg "";
+    for i = ofs to (ofs + len - 1) do
+      dbg_nonl "(ofs=%d c=%c(%d)" i str.[i] (Char.code str.[i])
+    done;
+    dbg ""
+  end
+
 let rec parse_substring state str ofs len =
   match state with
     | In_fixed_header fh ->
@@ -352,6 +376,7 @@ let rec parse_substring state str ofs len =
         let bytes_to_consume = min len fh_bytes_remaining in
           dbg "[dbus_message_parse] parse_substring ofs=%d len=%d Fixed-header(bytes-remaining=%d)"
             ofs len fh_bytes_remaining;
+          dbg_input str ofs len;
           String.blit str ofs fh.fixed_buffer fh.offset bytes_to_consume;
           fh.offset <- fh.offset + bytes_to_consume;
           if bytes_to_consume < fh_bytes_remaining
@@ -364,6 +389,7 @@ let rec parse_substring state str ofs len =
         let bytes_to_consume = min len bytes_remaining in
           dbg "[dbus_message_parse] parse_substring ofs=%d len=%d In-headers(bytes-remaining=%d) consuming %d"
             ofs len bytes_remaining bytes_to_consume;
+          dbg_input str ofs len;
         let bytes_remaining = bytes_remaining - bytes_to_consume in
           Buffer.add_substring ctxt.buffer str ofs bytes_to_consume;
           if bytes_remaining > 0
@@ -376,6 +402,7 @@ let rec parse_substring state str ofs len =
         let bytes_to_consume = min len bytes_remaining in
           dbg "[dbus_message_parse] parse_substring ofs=%d len=%d In-padding(bytes-remaining=%d) consuming %d"
             ofs len bytes_remaining bytes_to_consume;
+          dbg_input str ofs len;
         let bytes_remaining = bytes_remaining - bytes_to_consume in
         let tctxt = P.append_bytes ctxt.type_context str ofs bytes_to_consume in
         let tctxt = P.advance tctxt bytes_to_consume in
@@ -389,6 +416,7 @@ let rec parse_substring state str ofs len =
         let bytes_to_consume = min len bytes_remaining in
           dbg "[dbus_message_parse] parse_substring ofs=%d len=%d In-payload(bytes-remaining=%d) consuming %d"
             ofs len bytes_remaining bytes_to_consume;
+          dbg_input str ofs len;
         let bytes_remaining = bytes_remaining - bytes_to_consume in
         let tctxt = P.append_bytes ctxt.type_context str ofs bytes_to_consume in
           ctxt.type_context <- tctxt;

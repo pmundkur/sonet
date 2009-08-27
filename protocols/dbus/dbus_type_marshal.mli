@@ -41,3 +41,4 @@ val marshal_complete_type : context -> Dbus_type.t -> Dbus_value.t -> context
 val marshal_payload : context -> Dbus_type.t list -> Dbus_value.t list -> context
 
 val enable_debug_log : unit -> unit
+val disable_debug_log : unit -> unit

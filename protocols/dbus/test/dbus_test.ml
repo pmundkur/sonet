@@ -84,14 +84,16 @@ let _ =
 
   let verbose = ref false in
   let trace_input = ref false in
+  let show_input = ref false in
   let trace_output = ref false in
   let dbus_addr = ref "" in
   let larg = [
     ("-v",  Arg.Set verbose,      " verbose");
     ("-it", Arg.Set trace_input,  " input tracing");
+    ("-ixt", Arg.Set show_input,  " input data tracing");
     ("-ot", Arg.Set trace_output, " output tracing");
   ] in
-  let usage_msg = Printf.sprintf "%s [-v] [-it] [-ot]" Sys.argv.(0) in
+  let usage_msg = Printf.sprintf "%s [-v] [-it] [-ixt] [-ot]" Sys.argv.(0) in
     Arg.parse larg (fun s -> dbus_addr := s) usage_msg;
 
     if !trace_input then begin
@@ -101,6 +103,10 @@ let _ =
     if !trace_output then begin
       Dbus_message_marshal.enable_debug_log ();
       Dbus_type_marshal.enable_debug_log ();
+    end;
+    if !show_input then begin
+      Dbus_message_parse.enable_debug_log ();
+      Dbus_message_parse.enable_data_trace ();
     end;
 
     try
