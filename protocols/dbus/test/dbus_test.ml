@@ -13,14 +13,29 @@ let get_serial () =
 let get_hello_msg () =
   Dbus_msglib.make_hello_msg ~serial:(get_serial ())
 
+let get_filter_msg filter =
+  Dbus_msglib.make_add_match_msg ~serial:(get_serial ()) ~filter
+
+let send conn m =
+  Printf.printf "Sending: --->\n%!";
+  Dbus_message.pr_msg Format.std_formatter m;
+  Format.pp_print_flush Format.std_formatter ();
+  Dbus_connection.send conn m
+
 let auth_callback conn =
   Printf.printf "Authenticated!\n%!";
   (* We need to register with the bus; i.e. send a Hello message.  The
      response will contain our unique bus name.  *)
-  Dbus_connection.send conn (get_hello_msg ())
+  send conn (get_hello_msg ());
+  send conn (get_filter_msg "type='signal'");
+  send conn (get_filter_msg "type='method_call'");
+  send conn (get_filter_msg "type='method_return'");
+  send conn (get_filter_msg "type='error'")
 
-let msg_received_callback _ _ =
-  Printf.printf "Message received!\n%!"
+let msg_received_callback _ m =
+  Printf.printf "Received: <---\n%!";
+  Dbus_message.pr_msg Format.std_formatter m;
+  Format.pp_print_flush Format.std_formatter ()
 
 let shutdown_callback c =
   Printf.printf "Shutdown!\n%!";
@@ -68,29 +83,39 @@ let _ =
   Printexc.record_backtrace true;
 
   let verbose = ref false in
-  let tracing = ref false in
+  let trace_input = ref false in
+  let trace_output = ref false in
   let dbus_addr = ref "" in
   let larg = [
-    ("-v", Arg.Set verbose, " verbose");
-    ("-t", Arg.Set tracing, " tracing");
+    ("-v",  Arg.Set verbose,      " verbose");
+    ("-it", Arg.Set trace_input,  " input tracing");
+    ("-ot", Arg.Set trace_output, " output tracing");
   ] in
-  let usage_msg = Printf.sprintf "%s [-v] [-t]" Sys.argv.(0) in
+  let usage_msg = Printf.sprintf "%s [-v] [-it] [-ot]" Sys.argv.(0) in
     Arg.parse larg (fun s -> dbus_addr := s) usage_msg;
 
-    if !tracing then begin
-      Dbus_message_marshal.enable_debug_log ();
-      Dbus_type_marshal.enable_debug_log ();
+    if !trace_input then begin
       Dbus_message_parse.enable_debug_log ();
       Dbus_type_parse.enable_debug_log ();
     end;
+    if !trace_output then begin
+      Dbus_message_marshal.enable_debug_log ();
+      Dbus_type_marshal.enable_debug_log ();
+    end;
 
-  try
-    main (if !dbus_addr = ""
-          then system_sock_addr
-          else "\000" ^ !dbus_addr)
-  with
-    | (Unix.Unix_error (ec, m, s) as e)->
-        Printf.printf "Unix error: %s (%s %s)\n" (Unix.error_message ec) m s;
-        print_except (Printexc.to_string e) (Printexc.get_backtrace ())
-    | e ->
-        print_except (Printexc.to_string e) (Printexc.get_backtrace ())
+    try
+      main (if !dbus_addr = ""
+            then system_sock_addr
+            else "\000" ^ !dbus_addr)
+    with
+      | Unix.Unix_error (ec, m, s) as ex ->
+          Printf.printf "Unix error: %s (%s %s)\n" (Unix.error_message ec) m s;
+          print_except (Printexc.to_string ex) (Printexc.get_backtrace ())
+      | Dbus_message_parse.Parse_error e as ex ->
+          Printf.printf "Message parse error: %s\n" (Dbus_message_parse.error_message e);
+          print_except (Printexc.to_string ex) (Printexc.get_backtrace ())
+      | Dbus_type_parse.Parse_error e as ex ->
+          Printf.printf "Message parse error: %s\n" (Dbus_type_parse.error_message e);
+          print_except (Printexc.to_string ex) (Printexc.get_backtrace ())
+      | ex ->
+          print_except (Printexc.to_string ex) (Printexc.get_backtrace ())
