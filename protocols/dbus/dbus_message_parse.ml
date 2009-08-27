@@ -212,7 +212,7 @@ let make_method_return_msg ctxt =
 
 let make_error_msg ctxt =
   let lookup_required = lookup_required_header M.Msg_type_error in
-  let _, error_name_val = lookup_required M.Hdr_path ctxt in
+  let _, error_name_val = lookup_required M.Hdr_error_name ctxt in
   let error_name = C.to_string error_name_val in
   let _, reply_serial_val = lookup_required M.Hdr_reply_serial ctxt in
   let reply_serial = C.to_uint32 reply_serial_val in
