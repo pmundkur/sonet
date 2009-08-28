@@ -1,0 +1,14 @@
+These are non-obvious issues that were run into while implementing the
+DBus spec, and testing interop with the reference C implementation.
+
+- A message serial number of 0 is invalid according the DBus reference
+  implementation, but this is not mentioned anywhere in the DBus spec.
+
+- The alignment of the various value types is with respect to the
+  starting byte of the message (i.e. the endian byte in the message
+  header).
+
+  There are other possible origins with respect to which one could
+  measure the alignment, e.g. the starting byte of the authenticated
+  connection.  However, the origin with respect to which alignment is
+  computed is not specified anywhere in the DBus spec.
