@@ -341,6 +341,15 @@ let process_headers ctxt =
     *)
     (P.num_alignment_bytes tctxt ~align:8), ctxt
 
+let dbg_input str ofs len =
+  if !show_data then begin
+    dbg "";
+    for i = ofs to (ofs + len - 1) do
+      dbg_nonl "(ofs=%d c=%c(%d))" i str.[i] (Char.code str.[i])
+    done;
+    dbg ""
+  end
+
 let process_payload ctxt =
   if ctxt.payload_length > 0 then begin
     (* We have a payload, so we should have a signature header. *)
@@ -352,21 +361,16 @@ let process_payload ctxt =
          rely on C.to_signature throwing a (less-informative)
          conversion exception. *)
     let signature = C.to_signature sigval in
+      dbg "[dbus_message_parse] process_payload signature=%s data="
+        (T.signature_of_types signature);
+      (let str, ofs, len = P.get_parse_data ctxt.type_context in
+         dbg_input str ofs len);
       (* The parsing context has already been adjusted for us in
          process_headers, so we're ready to parse the payload. *)
     let payload, tctxt = P.parse_type_list signature ctxt.type_context in
       ctxt.signature <- signature;
       ctxt.payload <- payload;
       ctxt.type_context <- tctxt
-  end
-
-let dbg_input str ofs len =
-  if !show_data then begin
-    dbg "";
-    for i = ofs to (ofs + len - 1) do
-      dbg_nonl "(ofs=%d c=%c(%d)" i str.[i] (Char.code str.[i])
-    done;
-    dbg ""
   end
 
 let rec parse_substring state str ofs len =

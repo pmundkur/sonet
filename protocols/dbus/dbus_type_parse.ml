@@ -84,6 +84,9 @@ let num_parsed_bytes ctxt =
 let num_remaining_bytes ctxt =
   ctxt.length
 
+let get_parse_data ctxt =
+  ctxt.buffer, ctxt.offset, ctxt.length
+
 let num_alignment_bytes ctxt ~align =
   T.get_padding ~offset:ctxt.offset ~align
 

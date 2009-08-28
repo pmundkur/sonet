@@ -37,6 +37,7 @@ val init_context : Dbus_type.endian -> string -> offset:int -> length:int -> con
 
 val num_parsed_bytes : context -> int
 val num_remaining_bytes : context -> int
+val get_parse_data : context -> string * (* offset *) int * (* length *) int
 val num_alignment_bytes : context -> align:int -> int
 
 val append_bytes : context -> string -> offset:int -> length:int -> context
