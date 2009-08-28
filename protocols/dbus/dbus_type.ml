@@ -158,23 +158,25 @@ let rec get_complete_type clist in_array =
         let t, rem = get_complete_type rem true in
           (T_array t), rem
     | '(' :: rem ->
-        get_struct_type rem
+        get_struct_type ')' rem
     | ('{' as c) :: rem ->
         if not in_array then
           raise_sig_error (Sig_invalid_char c)
         else
-          let t, rem = get_struct_type rem in
+          let t, rem = get_struct_type '}' rem in
             if is_valid_dict_entry t
-            then (T_array t), rem
+            then t, rem
             else raise_sig_error (Sig_invalid "dict_entry not in array context")
     | c :: _ ->
         raise_sig_error (Sig_invalid_char c)
 
-and get_struct_type clist =
+and get_struct_type terminator clist =
   let rec helper acc = function
     | [] ->
         raise_sig_error Sig_incomplete
-    | ')' :: rem ->
+    | ')' :: rem when terminator = ')' ->
+        acc, rem
+    | '}' :: rem when terminator = '}' ->
         acc, rem
     | clist ->
         let t, rem = get_complete_type clist false in
