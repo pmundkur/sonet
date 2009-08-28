@@ -131,7 +131,7 @@ let recv_callback aconn s ofs len =
                  let read_offset = cs.read_offset + len - remaining in
                  let cs = { cs with
                               read_offset = read_offset;
-                              parse_state = P.init_state read_offset;
+                              parse_state = P.init_state 0;
                           } in
                    conn.state <- Connected cs;
                    conn.callbacks.msg_received_callback conn m;
@@ -150,7 +150,7 @@ let send conn msg =
     | Authenticating _ ->
         raise_error Authentication_pending
     | Connected cstate ->
-        let stream_offset = cstate.write_offset in
+        let stream_offset = 0 in
         let marshaled_size = MM.compute_marshaled_size stream_offset msg in
         let buffer = String.make marshaled_size '\000' in
         let marshaled_bytes = (MM.marshal_message ~stream_offset
