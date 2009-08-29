@@ -8,8 +8,9 @@
 #define CONSTR_EV_READABLE          0
 #define CONSTR_EV_WRITEABLE         1
 #define CONSTR_EV_PENDING_ERROR     2
-#define CONSTR_EV_ERROR             3
-#define CONSTR_EV_REMOVED           4
+#define CONSTR_EV_REMOVED           3
+
+#define CONSTR_EV_ERROR             0
 
 #define RECORD_EVENT_TYPE_OFS       0
 #define RECORD_EVENT_FD_OFS         1

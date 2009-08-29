@@ -340,16 +340,7 @@ value prepare_get_events_result(struct epoll_event *events, int n_fdevents) {
             n_oevents++;
     }
 
-    /* Optimize array allocation/initialization according to its size. */
-    if (n_oevents < Max_young_wosize) {
-        result = caml_alloc_small(n_oevents, 0);
-        for (i = 0; i < n_oevents; i++)
-            Field(result, i) = Val_unit;
-    } else {
-        result = caml_alloc_shr(n_oevents, 0);
-        for (i = 0; i < n_oevents; i++)
-            caml_initialize(&Field(result, i), Val_unit);
-    }
+    result = caml_alloc(n_oevents, 0);
 
     for (i = 0, idx = 0; i < n_fdevents; i++) {
         if (events[i].events & (EPOLLIN | EPOLLRDHUP))

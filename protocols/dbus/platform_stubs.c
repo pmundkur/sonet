@@ -90,7 +90,7 @@ CAMLprim value stub_float_of_bytes (value bytes) {
     int i;
 
     for (i = 0, c = (unsigned char *)&d; i < 8; i++, c++)
-        *c = Int_val(Field(bytes, i));
+        *c = (unsigned char) Int_val(Field(bytes, i));
 
     CAMLreturn(caml_copy_double(d));
 }
