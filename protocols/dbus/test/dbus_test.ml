@@ -67,7 +67,8 @@ let start_dbus_connection el dbus_addr =
 
 let run el =
   while Eventloop.has_connections el || Eventloop.has_timers el do
-    Eventloop.dispatch el 1.0
+    Eventloop.dispatch el 1.0;
+    Gc.major ();
   done
 
 let main dbus_addr =

@@ -248,13 +248,10 @@ let _ =
 
     try
       platform_test ();
-(*
       if not (test_value_roundtrip !verbose !tracing T.Little_endian) then
         exit 1;
-*)
       if not (test_msg_roundtrip !verbose !tracing T.Little_endian) then
         exit 1;
-
     with
       | Dbus_type_marshal.Marshal_error e ->
           print_except (Dbus_type_marshal.error_message e) (Printexc.get_backtrace ())
