@@ -28,10 +28,7 @@ exception Parse_error of error
 
 type state
 
-(* init_state is called with the current-offset in the bytestream
-   being parsed.  this is needed to compute the current alignment for
-   the parser. *)
-val init_state : int -> state
+val init_state : unit -> state
 
 type parse_result =
   | Parse_incomplete of state

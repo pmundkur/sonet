@@ -25,12 +25,11 @@ val error_message : error -> string
 
 type context
 
-val init_context : stream_offset:int -> Dbus_type.endian -> string -> offset:int -> length:int -> context
+val init_context : Dbus_type.endian -> string -> start_offset:int -> offset:int -> length:int -> context
 val get_marshaled_size : context -> int
-val get_current_stream_offset : context -> int
 
-val compute_marshaled_size : stream_offset:int -> Dbus_type.t -> Dbus_value.t -> int
-val compute_payload_marshaled_size : stream_offset:int -> Dbus_type.t list -> Dbus_value.t list -> int
+val compute_marshaled_size : offset:int -> Dbus_type.t -> Dbus_value.t -> int
+val compute_payload_marshaled_size : Dbus_type.t list -> Dbus_value.t list -> int
 
 val advance : context -> int -> context
 

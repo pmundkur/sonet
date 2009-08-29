@@ -94,29 +94,39 @@ let get_msgs () =
                ~serial:(get_serial ()));
     List.rev !msgs
 
-let marshal_msgs endian msgs =
-  let len =
-    (List.fold_left (fun ofs m ->
-                       ofs + Dbus_message_marshal.compute_marshaled_size ofs m
-                    ) 0 msgs) in
+let marshal_msgs verbose endian msgs =
+  let _, len =
+    (List.fold_left (fun (cnt, ofs) m ->
+                       let mbytes = Dbus_message_marshal.compute_marshaled_size m in
+                         if verbose then
+                           Printf.printf "[marshal_msgs]: msg %d (at ofs=%d) has size %d\n"
+                             cnt ofs mbytes;
+                         cnt + 1, ofs + mbytes
+                    ) (0, 0) msgs) in
+  let _ = (if verbose then
+             Printf.printf "[marshal_msgs] computed buf len of %d bytes for %d mesages.\n"
+               len (List.length msgs)) in
   let buf = String.make len 'P' in
   let total_len = String.length buf in
-  let final_ofs, remaining =
-    List.fold_left (fun (ofs, len) m ->
+  let _, final_ofs, remaining =
+    List.fold_left (fun (cnt, ofs, len) m ->
+                      let _ = (if verbose then
+                                 Printf.printf "[marshal_msgs]: marshalling msg %d at ofs=%d\n"
+                                   cnt ofs) in
                       let mbytes =
-                        Dbus_message_marshal.marshal_message ~stream_offset:ofs
+                        Dbus_message_marshal.marshal_message
                           endian buf ~offset:ofs ~length:len m in
                       let ofs, len = ofs + mbytes, len - mbytes in
                         assert (ofs <= total_len);
                         assert (len >= 0);
-                        ofs, len
-                   ) (0, total_len) msgs
+                        cnt + 1, ofs, len
+                   ) (0, 0, total_len) msgs
   in buf, final_ofs, remaining
 
 let test_msg_roundtrip verbose tracing endian =
   let result = ref true in
   let test_msgs = get_msgs () in
-  let buf, final_ofs, remaining = marshal_msgs endian test_msgs in
+  let buf, final_ofs, remaining = marshal_msgs verbose endian test_msgs in
   let buflen = String.length buf in
   let rec do_parse parsed_msgs state ofs =
     match Dbus_message_parse.parse_substring state buf ofs (buflen - ofs) with
@@ -129,11 +139,11 @@ let test_msg_roundtrip verbose tracing endian =
           end;
           let parsed_msgs = m :: parsed_msgs in
           if remaining > 0 then
-            do_parse parsed_msgs (Dbus_message_parse.init_state (buflen - remaining)) (buflen - remaining)
+            do_parse parsed_msgs (Dbus_message_parse.init_state ()) (buflen - remaining)
           else
             List.rev parsed_msgs
   in
-    let parsed_msgs = do_parse [] (Dbus_message_parse.init_state 0) 0 in
+    let parsed_msgs = do_parse [] (Dbus_message_parse.init_state ()) 0 in
       List.iter2 (fun mm pm ->
                     result := !result && mm = pm;
                     if verbose then begin
@@ -171,12 +181,12 @@ let marshal_types endian values =
   let len =
     (List.fold_left (fun ofs (t,v) ->
                        ofs + (Dbus_type_marshal.compute_marshaled_size
-                                ~stream_offset:ofs t v)
+                                ~offset:ofs t v)
                     ) 0 values) in
   let buf = String.make len 'P' in
   let total_len = String.length buf in
   let ctxt = (Dbus_type_marshal.init_context endian buf
-                ~stream_offset:0 ~offset:0 ~length:total_len) in
+                ~start_offset:0 ~offset:0 ~length:total_len) in
   let _ =
     List.fold_left (fun ctxt (t, v) ->
                       Dbus_type_marshal.marshal_complete_type ctxt t v
@@ -238,10 +248,13 @@ let _ =
 
     try
       platform_test ();
-      if not (test_msg_roundtrip !verbose !tracing T.Little_endian) then
-        exit 1;
+(*
       if not (test_value_roundtrip !verbose !tracing T.Little_endian) then
         exit 1;
+*)
+      if not (test_msg_roundtrip !verbose !tracing T.Little_endian) then
+        exit 1;
+
     with
       | Dbus_type_marshal.Marshal_error e ->
           print_except (Dbus_type_marshal.error_message e) (Printexc.get_backtrace ())

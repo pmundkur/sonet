@@ -34,11 +34,7 @@ let raise_error e =
 
 type conn_state = {
   (* recv state *)
-  read_offset : int;
   parse_state : P.state;
-
-  (* send state *)
-  write_offset : int;
 }
 
 type state =
@@ -65,9 +61,7 @@ and callbacks = {
 module Conns = Conn_map.Make(struct type conn = t end)
 
 let init_conn_state = {
-  read_offset = 0;
-  parse_state = P.init_state 0;
-  write_offset = 0;
+  parse_state = P.init_state ();
 }
 
 let connect_callback aconn =
@@ -122,17 +116,10 @@ let recv_callback aconn s ofs len =
       | Connected cs ->
           (match P.parse_substring cs.parse_state s ofs len with
              | P.Parse_incomplete s ->
-                 let cs = { cs with
-                              read_offset = cs.read_offset + len;
-                              parse_state = s;
-                          } in
+                 let cs = { parse_state = s } in
                    conn.state <- Connected cs
              | P.Parse_result (m, remaining) ->
-                 let read_offset = cs.read_offset + len - remaining in
-                 let cs = { cs with
-                              read_offset = read_offset;
-                              parse_state = P.init_state 0;
-                          } in
+                 let cs = { parse_state = P.init_state () } in
                    conn.state <- Connected cs;
                    conn.callbacks.msg_received_callback conn m;
                    receiver s (ofs + len - remaining) remaining
@@ -150,16 +137,12 @@ let send conn msg =
     | Authenticating _ ->
         raise_error Authentication_pending
     | Connected cstate ->
-        let stream_offset = 0 in
-        let marshaled_size = MM.compute_marshaled_size stream_offset msg in
+        let marshaled_size = MM.compute_marshaled_size msg in
         let buffer = String.make marshaled_size '\000' in
-        let marshaled_bytes = (MM.marshal_message ~stream_offset
-                                 T.Little_endian buffer
+        let marshaled_bytes = (MM.marshal_message T.Little_endian buffer
                                  ~offset:0 ~length:marshaled_size
                                  msg) in
-        let write_offset = (stream_offset + marshaled_size) mod 8 in
           assert (marshaled_size = marshaled_bytes);
-          conn.state <- Connected { cstate with write_offset = write_offset };
           C.send conn.conn buffer
     | Disconnected ->
         raise_error Disconnected_send

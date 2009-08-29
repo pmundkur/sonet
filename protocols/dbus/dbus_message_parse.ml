@@ -47,12 +47,10 @@ let disable_data_trace () =
 
 type fixed_header = {
   fixed_buffer : string;
-  fixed_start_offset : int;
   mutable offset: int;
 }
 
 type context = {
-  start_offset : int;
   buffer : Buffer.t;
   mutable type_context : P.context;
   mutable msg_type : M.msg_type;
@@ -107,29 +105,21 @@ let raise_error e =
 
 (* The signature of the header is:
    BYTE, BYTE, BYTE, BYTE, UINT32, UINT32, ARRAY of STRUCT of (BYTE,VARIANT)
-   or, showing padding,
-   BYTE, BYTE, BYTE, BYTE, padding-4, UINT32, UINT32, ARRAY.length (UINT32), padding-8
 *)
-let init_state start_offset =
+let init_state () =
   (* Compute the number of bytes to read for the fixed length header,
      taking into account the alignments of the elements of the fixed
      header. *)
-  let start_offset = start_offset mod 8 in
-  let length = start_offset + 4 * 1 in
-  let length = length + (T.get_padding ~offset:length ~align:4) in
-  let length = length + 2 * 4 + 4 in
-  let length = length + (T.get_padding ~offset:length ~align:8) in
+  let length = 4 * 1 + 2 * 4 + 4 in
   let buffer = String.make length '\x00' in
     In_fixed_header {
       fixed_buffer = buffer;
-      fixed_start_offset = start_offset;
-      offset = start_offset;
+      offset = 0;
     }
 
-let init_context start_offset type_context msg_type payload_length flags protocol_version
+let init_context type_context msg_type payload_length flags protocol_version
     serial bytes_remaining =
   {
-    start_offset = start_offset;
     buffer = Buffer.create bytes_remaining;
     type_context = type_context;
     msg_type = msg_type;
@@ -275,14 +265,14 @@ let make_message ctxt =
 
 (* See the documentation for init_state. *)
 let process_fixed_header fh =
-  let endian = fh.fixed_buffer.[fh.fixed_start_offset] in
+  let endian = fh.fixed_buffer.[0] in
   let endian =
     if endian = Protocol.little_endian then T.Little_endian
     else if endian = Protocol.big_endian then T.Big_endian
     else raise_error Invalid_endian in
   let tctxt = (P.init_context endian fh.fixed_buffer
-                 ~offset:(fh.fixed_start_offset + 1)
-                 ~length:((String.length fh.fixed_buffer) - fh.fixed_start_offset - 1)) in
+                 ~offset:1
+                 ~length:((String.length fh.fixed_buffer) - 1)) in
   let msg_type, tctxt = P.take_byte tctxt in
   let msg_type = parse_msg_type msg_type in
   let flags, tctxt = P.take_byte tctxt in
@@ -295,8 +285,7 @@ let process_fixed_header fh =
        need it to parse the array once we get the array data. *)
   let bytes_remaining, _ = P.take_uint32 tctxt in
   let bytes_remaining = Int64.to_int bytes_remaining in
-    bytes_remaining, (init_context fh.fixed_start_offset
-                        tctxt msg_type (Int64.to_int payload_length) flags
+    bytes_remaining, (init_context tctxt msg_type (Int64.to_int payload_length) flags
                         protocol_version serial bytes_remaining)
 
 let unpack_headers hdr_array =

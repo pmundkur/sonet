@@ -43,9 +43,9 @@ exception Marshal_error of error
 let raise_error e =
   raise (Marshal_error e)
 
-let rec compute_marshaled_size ~stream_offset t v =
+let rec compute_marshaled_size ~offset t v =
   V.type_check t v;
-  let padding = T.get_padding ~offset:stream_offset ~align:(T.alignment_of t) in
+  let padding = T.get_padding ~offset ~align:(T.alignment_of t) in
   let size =
     match t, v with
       | _, V.V_byte _         -> padding + 1
@@ -65,76 +65,71 @@ let rec compute_marshaled_size ~stream_offset t v =
             then raise_error Signature_too_long
             else padding + 1 + String.length s + 1
       | T.T_array te, V.V_array va ->
-          let offset = stream_offset + padding + 4 in
+          let end_offset = offset + padding + 4 in
           let end_offset =
-            Array.fold_left (fun stream_offset ve ->
-                               stream_offset + compute_marshaled_size ~stream_offset te ve
-                            ) offset va
-          in end_offset - stream_offset
+            Array.fold_left (fun offset ve ->
+                               offset + compute_marshaled_size ~offset te ve
+                            ) end_offset va
+          in end_offset - offset
       | T.T_struct tl, V.V_struct vl ->
-          let offset = stream_offset + padding in
+          let end_offset = offset + padding in
           let end_offset =
-            List.fold_left2 (fun stream_offset t v ->
-                               stream_offset + compute_marshaled_size ~stream_offset t v
-                            ) offset tl vl
-          in end_offset - stream_offset
+            List.fold_left2 (fun offset t v ->
+                               offset + compute_marshaled_size ~offset t v
+                            ) end_offset tl vl
+          in end_offset - offset
       | T.T_variant, V.V_variant (t, v) ->
-          let offset = stream_offset + padding in
-          let offset = (offset +
-                          (compute_marshaled_size ~stream_offset:offset
-                             (T.T_base T.B_signature) (V.V_signature [ t ]))) in
-          let offset = offset + compute_marshaled_size ~stream_offset:offset t v
-          in offset - stream_offset
+          let end_offset = offset + padding in
+          let end_offset = (end_offset +
+                              (compute_marshaled_size ~offset:end_offset
+                                 (T.T_base T.B_signature) (V.V_signature [ t ]))) in
+          let end_offset = end_offset + compute_marshaled_size ~offset:end_offset t v
+          in end_offset - offset
       | _ ->
           (* We should never reach here after the type_check in the first line. *)
           assert false
   in
     dbg " [compute_marshaled_size: ofs=%d size=%d type=%s val=%s"
-      stream_offset size (T.to_string t) (V.to_string v);
+      offset size (T.to_string t) (V.to_string v);
     size
 
-let compute_payload_marshaled_size ~stream_offset tlist vlist =
+let compute_payload_marshaled_size tlist vlist =
   V.type_check_args tlist vlist;
   let offset =
-    List.fold_left2 (fun stream_offset t v ->
-                       stream_offset + compute_marshaled_size ~stream_offset t v
-                    ) stream_offset tlist vlist
-  in offset - stream_offset
+    List.fold_left2 (fun offset t v ->
+                       offset + compute_marshaled_size ~offset t v
+                    ) 0 tlist vlist
+  in offset
 
 type context = {
   endian : T.endian;
   buffer : string;
   length : int;
-  starting_stream_offset : int;
-  starting_buffer_offset : int;
-  current_buffer_offset  : int;
+  start_offset   : int;
+  current_offset : int;
 }
 
-let init_context ~stream_offset endian buffer  ~offset ~length =
+let init_context endian buffer ~start_offset ~offset ~length =
   {
     endian = endian;
     buffer = buffer;
     length = length;
-    starting_stream_offset = stream_offset;
-    starting_buffer_offset = offset;
-    current_buffer_offset  = offset;
+    start_offset   = start_offset;
+    current_offset = offset;
   }
 
 let get_marshaled_size ctxt =
-  ctxt.current_buffer_offset - ctxt.starting_buffer_offset
-
-let get_current_stream_offset ctxt =
-  ctxt.starting_stream_offset + (get_marshaled_size ctxt)
+  ctxt.current_offset - ctxt.start_offset
 
 let advance ctxt nbytes =
   assert (ctxt.length >= nbytes);
   { ctxt with
-      current_buffer_offset = ctxt.current_buffer_offset + nbytes;
+      current_offset = ctxt.current_offset + nbytes;
       length = ctxt.length - nbytes;
   }
 
 let check_and_align_context ctxt ~align ~size dtype =
-  let padding = T.get_padding ~offset:(get_current_stream_offset ctxt) ~align in
+  let padding = T.get_padding ~offset:(ctxt.current_offset - ctxt.start_offset) ~align in
     if ctxt.length < padding + size then
       raise_error (Insufficient_space dtype);
     advance ctxt padding
@@ -142,7 +137,7 @@ let check_and_align_context ctxt ~align ~size dtype =
 let put_byte ?(dtype=T.T_base T.B_byte) ctxt b =
   let align = T.alignment_of (T.T_base T.B_byte) in
   let ctxt = check_and_align_context ctxt ~align ~size:1 dtype in
-    ctxt.buffer.[ctxt.current_buffer_offset] <- b;
+    ctxt.buffer.[ctxt.current_offset] <- b;
     advance ctxt 1
 
 let marshal_byte ctxt v =
@@ -153,8 +148,8 @@ let marshal_byte ctxt v =
 let put_u16 ?(dtype=T.T_base T.B_uint16) ctxt (b0, b1) =
   let align = T.alignment_of dtype in
   let ctxt = check_and_align_context ctxt ~align ~size:2 dtype in
-    ctxt.buffer.[ctxt.current_buffer_offset] <- b0;
-    ctxt.buffer.[ctxt.current_buffer_offset + 1] <- b1;
+    ctxt.buffer.[ctxt.current_offset] <- b0;
+    ctxt.buffer.[ctxt.current_offset + 1] <- b1;
     advance ctxt 2
 
 let from_uint16 endian i =
@@ -183,10 +178,10 @@ let marshal_uint16 ctxt v =
 let put_u32 ?(dtype=T.T_base T.B_uint32) ctxt (b0, b1, b2, b3) =
   let align = T.alignment_of dtype in
   let ctxt = check_and_align_context ctxt ~align ~size:4 dtype in
-    ctxt.buffer.[ctxt.current_buffer_offset] <- b0;
-    ctxt.buffer.[ctxt.current_buffer_offset + 1] <- b1;
-    ctxt.buffer.[ctxt.current_buffer_offset + 2] <- b2;
-    ctxt.buffer.[ctxt.current_buffer_offset + 3] <- b3;
+    ctxt.buffer.[ctxt.current_offset] <- b0;
+    ctxt.buffer.[ctxt.current_offset + 1] <- b1;
+    ctxt.buffer.[ctxt.current_offset + 2] <- b2;
+    ctxt.buffer.[ctxt.current_offset + 3] <- b3;
     advance ctxt 4
 
 let from_int32 endian i =
@@ -229,14 +224,14 @@ let marshal_boolean ctxt v =
 let put_u64 ?(dtype=T.T_base T.B_uint64) ctxt (b0, b1, b2, b3, b4, b5, b6, b7) =
   let align = T.alignment_of dtype in
   let ctxt = check_and_align_context ctxt ~align ~size:8 dtype in
-    ctxt.buffer.[ctxt.current_buffer_offset] <- b0;
-    ctxt.buffer.[ctxt.current_buffer_offset + 1] <- b1;
-    ctxt.buffer.[ctxt.current_buffer_offset + 2] <- b2;
-    ctxt.buffer.[ctxt.current_buffer_offset + 3] <- b3;
-    ctxt.buffer.[ctxt.current_buffer_offset + 4] <- b4;
-    ctxt.buffer.[ctxt.current_buffer_offset + 5] <- b5;
-    ctxt.buffer.[ctxt.current_buffer_offset + 6] <- b6;
-    ctxt.buffer.[ctxt.current_buffer_offset + 7] <- b7;
+    ctxt.buffer.[ctxt.current_offset] <- b0;
+    ctxt.buffer.[ctxt.current_offset + 1] <- b1;
+    ctxt.buffer.[ctxt.current_offset + 2] <- b2;
+    ctxt.buffer.[ctxt.current_offset + 3] <- b3;
+    ctxt.buffer.[ctxt.current_offset + 4] <- b4;
+    ctxt.buffer.[ctxt.current_offset + 5] <- b5;
+    ctxt.buffer.[ctxt.current_offset + 6] <- b6;
+    ctxt.buffer.[ctxt.current_offset + 7] <- b7;
     advance ctxt 8
 
 let from_int64 endian i =
@@ -277,23 +272,23 @@ let marshal_double ctxt v =
     (match Platform.get_host_endianness (), ctxt.endian with
        | Platform.Little_endian, T.Little_endian
        | Platform.Big_endian, T.Big_endian ->
-           ctxt.buffer.[ctxt.current_buffer_offset] <- db.(0);
-           ctxt.buffer.[ctxt.current_buffer_offset + 1] <- db.(1);
-           ctxt.buffer.[ctxt.current_buffer_offset + 2] <- db.(2);
-           ctxt.buffer.[ctxt.current_buffer_offset + 3] <- db.(3);
-           ctxt.buffer.[ctxt.current_buffer_offset + 4] <- db.(4);
-           ctxt.buffer.[ctxt.current_buffer_offset + 5] <- db.(5);
-           ctxt.buffer.[ctxt.current_buffer_offset + 6] <- db.(6);
-           ctxt.buffer.[ctxt.current_buffer_offset + 7] <- db.(7)
+           ctxt.buffer.[ctxt.current_offset] <- db.(0);
+           ctxt.buffer.[ctxt.current_offset + 1] <- db.(1);
+           ctxt.buffer.[ctxt.current_offset + 2] <- db.(2);
+           ctxt.buffer.[ctxt.current_offset + 3] <- db.(3);
+           ctxt.buffer.[ctxt.current_offset + 4] <- db.(4);
+           ctxt.buffer.[ctxt.current_offset + 5] <- db.(5);
+           ctxt.buffer.[ctxt.current_offset + 6] <- db.(6);
+           ctxt.buffer.[ctxt.current_offset + 7] <- db.(7)
        | _ ->
-           ctxt.buffer.[ctxt.current_buffer_offset] <- db.(7);
-           ctxt.buffer.[ctxt.current_buffer_offset + 1] <- db.(6);
-           ctxt.buffer.[ctxt.current_buffer_offset + 2] <- db.(5);
-           ctxt.buffer.[ctxt.current_buffer_offset + 3] <- db.(4);
-           ctxt.buffer.[ctxt.current_buffer_offset + 4] <- db.(3);
-           ctxt.buffer.[ctxt.current_buffer_offset + 5] <- db.(2);
-           ctxt.buffer.[ctxt.current_buffer_offset + 6] <- db.(1);
-           ctxt.buffer.[ctxt.current_buffer_offset + 7] <- db.(0)
+           ctxt.buffer.[ctxt.current_offset] <- db.(7);
+           ctxt.buffer.[ctxt.current_offset + 1] <- db.(6);
+           ctxt.buffer.[ctxt.current_offset + 2] <- db.(5);
+           ctxt.buffer.[ctxt.current_offset + 3] <- db.(4);
+           ctxt.buffer.[ctxt.current_offset + 4] <- db.(3);
+           ctxt.buffer.[ctxt.current_offset + 5] <- db.(2);
+           ctxt.buffer.[ctxt.current_offset + 6] <- db.(1);
+           ctxt.buffer.[ctxt.current_offset + 7] <- db.(0)
     );
     advance ctxt 8
 
@@ -303,7 +298,7 @@ let put_string ?(dtype=T.T_base T.B_string) ctxt s =
                 (from_uint32 ctxt.endian (Int64.of_int slen))) in
     if ctxt.length < slen then
       raise_error (Insufficient_space dtype);
-    String.blit s 0 ctxt.buffer ctxt.current_buffer_offset slen;
+    String.blit s 0 ctxt.buffer ctxt.current_offset slen;
     let ctxt = advance ctxt slen in
       put_byte ctxt '\x00'
 
@@ -322,7 +317,7 @@ let marshal_signature ctxt v =
   let ctxt = (check_and_align_context ctxt ~align:1 ~size:(1 + slen + 1)
                 (T.T_base T.B_signature)) in
   let ctxt = put_byte ctxt (Char.chr slen) in
-    String.blit signature 0 ctxt.buffer ctxt.current_buffer_offset slen;
+    String.blit signature 0 ctxt.buffer ctxt.current_offset slen;
     let ctxt = advance ctxt slen in
       put_byte ctxt '\x00'
 
@@ -356,20 +351,20 @@ let rec marshal_complete_type ctxt t v =
 
            We need to compute the size of the array in bytes; to do
            that using compute_marshaled_size, we need to compute the
-           stream_offset at which the array data will be marshaled.
+           msg_offset at which the array data will be marshaled.
         *)
-        let stream_offset = get_current_stream_offset ctxt in
+        let msg_offset = ctxt.current_offset - ctxt.start_offset in
           (* Compute the padding before we put down the array size. *)
-        let pre_size_padding  = T.get_padding ~offset:stream_offset ~align:4 in
+        let pre_size_padding  = T.get_padding ~offset:msg_offset ~align:4 in
           (* Compute the padding after the array size, but before the
              array data. *)
-        let pre_data_padding_offset = stream_offset + pre_size_padding + 4 in
+        let pre_data_padding_offset = msg_offset + pre_size_padding + 4 in
         let pre_data_padding = (T.get_padding ~offset:pre_data_padding_offset
                                   ~align:(T.alignment_of te)) in
         let data_start_offset = pre_data_padding_offset + pre_data_padding in
         let end_offset =
-          Array.fold_left (fun stream_offset ve ->
-                             stream_offset + compute_marshaled_size ~stream_offset te ve
+          Array.fold_left (fun offset ve ->
+                             offset + compute_marshaled_size ~offset te ve
                           ) data_start_offset va in
         let array_size = end_offset - data_start_offset in
         let ctxt = put_u32 ~dtype:t ctxt (from_int32 ctxt.endian (Int32.of_int array_size)) in
@@ -389,7 +384,7 @@ let rec marshal_complete_type ctxt t v =
         assert false
   in
     dbg " [marshal_complete_type: ofs=%d size=%d type=%s value=%s"
-      (get_current_stream_offset ctxt)
+      ctxt.current_offset
       ((get_marshaled_size ctxt') - (get_marshaled_size ctxt))
       (T.to_string t) (V.to_string v);
     ctxt'

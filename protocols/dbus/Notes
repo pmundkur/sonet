@@ -11,4 +11,9 @@ DBus spec, and testing interop with the reference C implementation.
   There are other possible origins with respect to which one could
   measure the alignment, e.g. the starting byte of the authenticated
   connection.  However, the origin with respect to which alignment is
-  computed is not specified anywhere in the DBus spec.
+  computed is not specified anywhere in the DBus spec.  The closest
+  the spec comes to hinting at the origin is:
+
+    "The length of the header must be a multiple of 8, allowing the
+     body to begin on an 8-byte boundary when storing the entire
+     message in a single buffer."
