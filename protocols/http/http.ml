@@ -60,11 +60,6 @@ let is_token_char_array = [|
 let is_token_char c =
   is_token_char_array.(Char.code c) = 1
 
-let starts_with_space = function
-  | []
-  | ' ' :: _ | '\t' :: _ -> true
-  | _ -> false
-
 let rec strip_leading_spaces = function
   | ' ' :: clist | '\t' :: clist ->
       strip_leading_spaces clist
@@ -105,9 +100,9 @@ module Headers = struct
   type cursor =
     | Start_header
     | In_field_name of char list
-    | In_field_value of string * char list
-    | In_field_value_CR of string * char list
-    | In_field_value_LF of string * char list
+    | In_field_value of string * char list * (* starts with whitespace *) bool
+    | In_field_value_CR of string * char list * (* starts with whitespace *) bool
+    | In_field_value_LF of string * char list * (* starts with whitespace *) bool
     | Header_CR
     | Done
 
@@ -115,11 +110,11 @@ module Headers = struct
     | Start_header -> "Start-header"
     | In_field_name cl ->
         Printf.sprintf "In-field-name \"%s\"" (rev_string_of_chars cl)
-    | In_field_value (s, cl) ->
+    | In_field_value (s, cl, _) ->
         Printf.sprintf "In-field-value \"%s: %s\"" s (rev_string_of_chars cl)
-    | In_field_value_CR (s, cl) ->
+    | In_field_value_CR (s, cl, _) ->
         Printf.sprintf "In-field-value-CR \"%s: %s\"" s (rev_string_of_chars cl)
-    | In_field_value_LF (s, cl) ->
+    | In_field_value_LF (s, cl, _) ->
         Printf.sprintf "In-field-value-LF \"%s: %s\"" s (rev_string_of_chars cl)
     | Header_CR -> "Header-CR"
     | Done -> "Done"
@@ -151,9 +146,9 @@ module Headers = struct
 
   let is_done s = s.cursor = Done
 
+  let raise_bad_char s c = raise_error (Parse_error (s.cursor, c))
   let parse_char s c =
-    dbg "parsing %C in state %s...\n" c (string_of_cursor s.cursor);
-    let raise_bad_char () = raise_error (Parse_error (s.cursor, c)) in
+    (* dbg "parsing %C in state %s...\n" c (string_of_cursor s.cursor); *)
       match s.cursor with
         | Start_header ->
             (match c with
@@ -163,7 +158,7 @@ module Headers = struct
             )
         | Header_CR ->
             if c = '\n' then s.cursor <- Done
-            else raise_bad_char ()
+            else raise_bad_char s c
         | In_field_name clist ->
             (* Ideally, we want to remain in the
                In_field_name state only if we are getting
@@ -177,29 +172,29 @@ module Headers = struct
                (except '\r' and '\n').
             *)
             (match c with
-               | '\r' | '\n' -> raise_bad_char ()
-               | ':' -> s.cursor <- In_field_value ((rev_string_of_chars clist), [])
+               | '\r' | '\n' -> raise_bad_char s c
+               | ':' -> s.cursor <- In_field_value ((rev_string_of_chars clist), [], true)
                | _   -> s.cursor <- In_field_name (c :: clist)
             )
-        | In_field_value (name, clist) ->
+        | In_field_value (name, clist, starts_with_space) ->
             (match c with
-               | '\r' -> s.cursor <- In_field_value_CR (name, clist)
-               | '\n' -> s.cursor <- In_field_value_LF (name, clist)
+               | '\r' -> s.cursor <- In_field_value_CR (name, clist, starts_with_space)
+               | '\n' -> s.cursor <- In_field_value_LF (name, clist, starts_with_space)
                | ' ' | '\t' ->
                    (* compress whitespace *)
-                   let nclist = if starts_with_space clist then clist else c :: clist in
-                     s.cursor <- In_field_value (name, nclist)
-               | _ -> s.cursor <- In_field_value (name, c :: clist)
+                   let nclist = if starts_with_space then clist else c :: clist in
+                     s.cursor <- In_field_value (name, nclist, true)
+               | _ -> s.cursor <- In_field_value (name, c :: clist, false)
             )
-        | In_field_value_CR (name, clist) ->
-            if c = '\n' then s.cursor <- In_field_value_LF (name, clist)
-            else raise_bad_char ()
-        | In_field_value_LF (name, clist) ->
+        | In_field_value_CR (name, clist, starts_with_space) ->
+            if c = '\n' then s.cursor <- In_field_value_LF (name, clist, starts_with_space)
+            else raise_bad_char s c
+        | In_field_value_LF (name, clist, starts_with_space) ->
             (match c with
                | ' ' | '\t' ->
                    (* header has line-wrapped; compress whitespace *)
-                   let nclist = if starts_with_space clist then clist else c :: clist in
-                     s.cursor <- In_field_value (name, nclist)
+                   let nclist = if starts_with_space then clist else c :: clist in
+                     s.cursor <- In_field_value (name, nclist, true)
                | _ ->
                    (* end-of-header line; strip trailing whitespace if any *)
                    s.headers <- (add_header name
@@ -338,13 +333,13 @@ module Request_header = struct
      Request-Line    = Method SP Request-URI SP HTTP-Version CRLF ; HTTP/{1.0,1.1}
   *)
 
+  let raise_bad_char s c = raise_error (Parse_error (s.cursor, c))
   let parse_char s c =
-    dbg "parsing %C in state %s...\n" c (string_of_cursor s.cursor);
-    let raise_bad_char () = raise_error (Parse_error (s.cursor, c)) in
+    (* dbg "parsing %C in state %s...\n" c (string_of_cursor s.cursor); *)
       match s.cursor with
         | Start ->
             if is_token_char c then s.cursor <- In_method [ c ]
-            else if not (is_space c) then raise_bad_char ()
+            else if not (is_space c) then raise_bad_char s c
         | In_method cl ->
             (match c with
                | '\r' | '\n' -> raise_error Incomplete_request_line
@@ -389,7 +384,7 @@ module Request_header = struct
               s.cursor <- In_uri (c :: cl)
         | Uri_CR ->
             if c = '\n' then s.cursor <- Done (* HTTP 0.9 *)
-            else raise_bad_char ()
+            else raise_bad_char s c
         | Uri_SP ->
             (match c with
                | ' ' | '\t' -> ()
@@ -418,11 +413,11 @@ module Request_header = struct
                | ' ' | '\t' -> ()
                | '\r'       -> s.cursor <- Req_line_CR
                | '\n'       -> s.cursor <- In_headers (Headers.init_state ())
-               | _          -> raise_bad_char ()
+               | _          -> raise_bad_char s c
             )
         | Req_line_CR ->
             if c = '\n' then s.cursor <- In_headers (Headers.init_state ())
-            else raise_bad_char ()
+            else raise_bad_char s c
         | In_headers hs ->
             Headers.parse_char hs c;
             if Headers.is_done hs then begin
@@ -671,13 +666,13 @@ module Response_header = struct
      So, we can only be parsing a full status line.
   *)
 
+  let raise_bad_char s c = raise_error (Parse_error (s.cursor, c))
   let parse_char s c =
-    dbg "parsing %C in state %s...\n" c (string_of_cursor s.cursor);
-    let raise_bad_char () = raise_error (Parse_error (s.cursor, c)) in
+    (* dbg "parsing %C in state %s...\n" c (string_of_cursor s.cursor); *)
       match s.cursor with
         | Start ->
             if is_token_char c then s.cursor <- In_version [ c ]
-            else if not (is_space c) then raise_bad_char ()
+            else if not (is_space c) then raise_bad_char s c
         | In_version cl ->
             (match c with
                | ' ' | '\t' ->
@@ -696,7 +691,7 @@ module Response_header = struct
             (match c with
                | ' ' | '\t' -> ()
                | _ when Httputils.is_digit c -> s.cursor <- In_status_code ((Httputils.digit_value c), 1)
-               | _ -> raise_bad_char ()
+               | _ -> raise_bad_char s c
             )
         | In_status_code (sc, nd) ->
             (match c with
@@ -714,7 +709,7 @@ module Response_header = struct
                      if nd >= 3 then raise_error (Unsupported_status_code nsc)
                      else s.cursor <- In_status_code (nsc, nd + 1)
                | _ ->
-                   raise_bad_char ()
+                   raise_bad_char s c
             )
         | Status_code_SP ->
             (match c with
@@ -740,7 +735,7 @@ module Response_header = struct
             )
         | Resp_line_CR ->
             if c = '\n' then s.cursor <- In_headers (Headers.init_state ())
-            else raise_bad_char ()
+            else raise_bad_char s c
         | In_headers hs ->
             Headers.parse_char hs c;
             if Headers.is_done hs then begin
@@ -990,9 +985,9 @@ module Payload = struct
             f content 0 (String.length content) final
       | _ -> ()
 
+  let raise_bad_char s c = raise_error (Parse_error (s.cursor, c))
   let parse_char s c =
-    dbg "parsing %C in state %s...\n" c (string_of_cursor s.cursor);
-    let raise_bad_char () = raise_error (Parse_error (s.cursor, c)) in
+    (* dbg "parsing %C in state %s...\n" c (string_of_cursor s.cursor); *)
       match s.cursor with
         | In_body ->
             check_payload_callback s false;
@@ -1008,7 +1003,7 @@ module Payload = struct
             if Httputils.is_hex c then begin
               s.remaining_length <- Int64.of_int (Httputils.hex_value c);
               s.cursor <- In_chunk_length
-            end else raise_bad_char ()
+            end else raise_bad_char s c
         | In_chunk_length ->
             (match c with
                | '\r' ->
@@ -1023,7 +1018,7 @@ module Payload = struct
                    (* TODO: check for overflow!! *)
                    s.remaining_length <- (Int64.add (Int64.shift_left s.remaining_length 4)
                                             (Int64.of_int (Httputils.hex_value c)))
-               | _ -> raise_bad_char ()
+               | _ -> raise_bad_char s c
             )
         | In_chunk_extension ->
             (match c with
@@ -1040,13 +1035,13 @@ module Payload = struct
               if s.remaining_length = 0L
               then s.cursor <- In_trailer (Headers.init_state ())
               else s.cursor <- In_chunk
-            end else raise_bad_char ()
+            end else raise_bad_char s c
         | In_chunk ->
             if s.remaining_length = 0L then
               (match c with
                  | '\r' -> s.cursor <- Chunk_CR
                  | '\n' -> s.cursor <- Start_chunk_length
-                 | _    -> raise_bad_char ()
+                 | _    -> raise_bad_char s c
               )
             else begin
               check_payload_callback s false;
@@ -1055,7 +1050,7 @@ module Payload = struct
             end
         | Chunk_CR ->
             if c = '\n' then s.cursor <- Start_chunk_length
-            else raise_bad_char ()
+            else raise_bad_char s c
         | In_trailer hs ->
             Headers.parse_char hs c;
             if Headers.is_done hs then begin
