@@ -1,0 +1,10 @@
+JSON_CONVERT_DIR = $(dir json_convert)
+JSONRPC_IDL_DIR  = $(dir jsonrpc_idl)
+
+.SUBDIRS: json_convert
+	include OMakefile
+	export JSON_CONVERT JSON_CONVERT_PROG
+
+.SUBDIRS: jsonrpc_idl
+	include OMakefile
+	export GEN_RPC GEN_RPC_PROG

@@ -1,12 +1,11 @@
-OCAMLFLAGS += -I ..
+OCAMLFLAGS += -I $(JSONRPC_LIB_DIR)
 
-OCAML_LIBS += ../jsonrpc
+OCAML_LIBS += $(JSONRPC_LIB_DIR)/jsonrpc
 
 TEST_PARSER_PROG = test_parser
 TEST_PARSER = $(OCamlProgram $(TEST_PARSER_PROG), test_parser)
 
 .DEFAULT: $(TEST_PARSER)
-
 
 .PHONY: clean
 clean:

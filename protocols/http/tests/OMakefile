@@ -1,5 +1,3 @@
-HTTP_LIB_DIR = ..
-
 OCAMLFLAGS += -I $(HTTP_LIB_DIR)
 
 OCAML_LIBS[] += $(HTTP_LIB_DIR)/http

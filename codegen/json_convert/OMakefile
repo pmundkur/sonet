@@ -10,14 +10,14 @@ CONV_FILES[] =
 	codegen
 	gen_json_conv
 
-JSON_CONV_PROG = gen_json_conv
-JSON_CONV = $(OCamlProgram $(JSON_CONV_PROG), $(CONV_FILES))
+JSON_CONVERT_PROG = gen_json_conv
+JSON_CONVERT = $(OCamlProgram $(JSON_CONVERT_PROG), $(CONV_FILES))
 
-.DEFAULT: $(JSON_CONV)
+.DEFAULT: $(JSON_CONVERT)
 
 .PHONY: clean
 clean:
-	$(CLEAN) $(JSON_CONV) $(GEN_FILES)
+	$(CLEAN) $(JSON_CONVERT) $(GEN_FILES)
 
 .SUBDIRS: tests
 

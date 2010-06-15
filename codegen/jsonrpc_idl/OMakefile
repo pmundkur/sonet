@@ -1,5 +1,5 @@
-syntax_json_conv.ml: syntax.ml $(JSON_CONV)
-	../json_convert/$(JSON_CONV_PROG) -i $< -o $@
+syntax_json_conv.ml: syntax.ml $(JSON_CONVERT)
+	$(JSON_CONVERT_DIR)/$(JSON_CONVERT_PROG) -i $< -o $@
 
 OCAMLFLAGS += -I $(JSONRPC_LIB_DIR)
 

@@ -1,0 +1,15 @@
+HTTP_LIB_DIR    = $(dir http)
+JSONRPC_LIB_DIR = $(dir jsonrpc)
+DBUS_LIB_DIR    = $(dir dbus)
+
+.SUBDIRS: http
+	include OMakefile
+	export HTTP_LIB
+
+.SUBDIRS: jsonrpc
+	include OMakefile
+	export JSONRPC_LIB
+
+.SUBDIRS: dbus
+	include OMakefile
+	export DBUS_LIB
