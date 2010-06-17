@@ -70,7 +70,7 @@ let () =
     ("-d", Arg.Set Codegen.verbose, " debug codegen logging");
   ] in
   let usage_msg = Printf.sprintf "%s -i <file> [-o <file>]" Sys.argv.(0) in
-    Arg.parse larg (fun s -> ()) usage_msg;
+    Arg.parse larg (fun _ -> ()) usage_msg;
 
     if !output = "" then output := default_output_filename !input;
 

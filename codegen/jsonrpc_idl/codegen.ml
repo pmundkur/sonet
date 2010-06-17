@@ -135,7 +135,7 @@ module Server = struct
       fprintf ff "@]@,]@,@,"
     end
 
-  let gen_param ff venv otvn i p =
+  let gen_param ff venv otvn _i p =
     let arg, venv = Var_env.new_ident_from_name venv p.param_name in
       fprintf ff "let %s = %s (Json_conv.get_object_field %s \"%s\") in@," (name_of_var arg) (Type_conv.of_json p.param_type) otvn p.param_name;
       arg, venv
@@ -161,7 +161,7 @@ module Server = struct
         )
       in
       let respv, venv = Var_env.new_ident_from_name venv "resp" in
-      let respjv, venv = Var_env.new_ident_from_name venv "resp_j" in
+      let respjv, _venv = Var_env.new_ident_from_name venv "resp_j" in
       let respvn, respjvn = name_of_var respv, name_of_var respjv in
         fprintf ff "let %s = %s.%s %s %s in@," respvn impl_module methname args_str cbvn;
         fprintf ff "let %s = %s %s in@," respjvn (Type_conv.to_json resp.response_value.param_type) respvn;
@@ -173,7 +173,7 @@ module Server = struct
     let methname = rpc.rpc_request.request_handler in
     let params = rpc.rpc_request.request_params in
       fprintf ff "@[<v 8>| \"%s\" ->@," rpc.rpc_request.request_name;
-      let args_str, venv =
+      let args_str, _venv =
         (match params with
            | [] ->
                "()", venv
@@ -189,7 +189,7 @@ module Server = struct
       in
         fprintf ff "%s.%s %s %s@]@," impl_module methname args_str cbvn
 
-  let gen_notification_dispatch ff venv server impl_module nlist =
+  let gen_notification_dispatch ff venv _server impl_module nlist =
     let dispv, venv = Var_env.new_ident_from_name venv "dispatch_notification" in
     let reqv, venv = Var_env.new_ident_from_name venv "req" in
     let cbv, venv = Var_env.new_ident_from_name venv "callback_arg" in
@@ -220,7 +220,7 @@ module Server = struct
       List.iter (fun (rpc, resp) -> gen_request ff venv reqv implvn cbvn rpc resp) rpcs;
       fprintf ff "| _ -> raise (Jsonrpc.Unknown_request %s.Jsonrpc.method_name)@]@," reqvn;
       let ev, venv = Var_env.new_ident_from_name venv "e" in
-      let errv, venv = Var_env.new_ident_from_name venv "err" in
+      let errv, _venv = Var_env.new_ident_from_name venv "err" in
       let evn, errvn = name_of_var ev, name_of_var errv in
         fprintf ff "@[<v 8> with %s ->@," evn;
         fprintf ff "let %s = %s.%s %s %s in@," errvn implvn server.server_error_handler evn cbvn;
@@ -262,7 +262,7 @@ module Client = struct
     fprintf ff "@,type rpc_id";
     fprintf ff "@,type context@,";
     fprintf ff "@,val get_new_rpc_id : unit -> rpc_id * Json.t@,";
-    ignore (List.fold_left (fun acc (rpc, resp) ->
+    ignore (List.fold_left (fun acc (_rpc, resp) ->
                               if List.mem resp.response_handler acc then acc
                               else begin
                                 gen_handler_type ff resp;
@@ -280,7 +280,7 @@ module Client = struct
   let end_maker ff =
     fprintf ff "@]@\nend@\n@\n@?"
 
-  let gen_resp_handler ff modname c (rpc, resp) =
+  let gen_resp_handler ff modname _c (_rpc, resp) =
     fprintf ff "@,@[<v 8>let %s resp =@," (gen_resp_name resp);
     fprintf ff "%s.%s (%s resp)@]@," modname resp.response_handler
       (Type_conv.of_json resp.response_value.param_type)
@@ -294,13 +294,13 @@ module Client = struct
                               end
                            ) [] rpc_list)
 
-  let generate_rpc ff venv modname s rpc =
+  let generate_rpc ff venv modname _s rpc =
     let params = rpc.rpc_request.request_params in
     let args = List.map (fun p -> p.param_name) params in
     let avlist, venv = Var_env.new_idents_from_names venv ~prefix:"o_" args in
     let vvlist, venv = Var_env.new_idents_from_names venv ~prefix:"j_" args in
     let rpcv, venv = Var_env.new_ident_from_name venv "rpc_id" in
-    let jrpcv, venv = Var_env.new_ident_from_name venv "jrpc_id" in
+    let jrpcv, _venv = Var_env.new_ident_from_name venv "jrpc_id" in
     let rpcvn, jrpcvn = name_of_var rpcv, name_of_var jrpcv in
     let meth_name = gen_method_name rpc.rpc_request.request_name in
     let args_str =
@@ -322,7 +322,7 @@ module Client = struct
       (match rpc.rpc_response with
          | None ->
              fprintf ff "let %s = None in@," jrpcvn
-         | Some resp ->
+         | Some _resp ->
              fprintf ff "let %s, %s = %s.get_new_rpc_id () in@," rpcvn jrpcvn modname;
              fprintf ff "let %s = Some %s in@," jrpcvn jrpcvn
       );
@@ -386,7 +386,8 @@ let generate_endpoint spec e fn =
               ) (get_matching_servers spec e.endpoint_servers);
     List.iter (fun c ->
                  generate_client ff spec c
-              ) (get_matching_servers spec e.endpoint_clients)
+              ) (get_matching_servers spec e.endpoint_clients);
+    close_out oc
 
 let generate spec endpoints =
   List.iter (fun (ep, outf) ->

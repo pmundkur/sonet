@@ -126,7 +126,7 @@ let marshal_msgs verbose endian msgs =
 let test_msg_roundtrip verbose tracing endian =
   let result = ref true in
   let test_msgs = get_msgs () in
-  let buf, final_ofs, remaining = marshal_msgs verbose endian test_msgs in
+  let buf, _final_ofs, _remaining = marshal_msgs verbose endian test_msgs in
   let buflen = String.length buf in
   let rec do_parse parsed_msgs state ofs =
     match Dbus_message_parse.parse_substring state buf ofs (buflen - ofs) with
@@ -203,7 +203,7 @@ let parse_types endian types buf =
                    ) (ctxt, []) types
   in List.rev values
 
-let test_value_roundtrip verbose tracing endian =
+let test_value_roundtrip verbose _tracing endian =
   let result = ref true in
   let mvalues = get_values () in
   let types = List.map (fun (t, _) -> t) mvalues in
@@ -237,7 +237,7 @@ let _ =
     ("-t", Arg.Set tracing, " tracing");
   ] in
   let usage_msg = Printf.sprintf "%s [-v] [-t]" Sys.argv.(0) in
-    Arg.parse larg (fun s -> Printf.printf "%s\n" usage_msg; exit 0) usage_msg;
+    Arg.parse larg (fun _ -> Printf.printf "%s\n" usage_msg; exit 0) usage_msg;
 
     if !tracing then begin
       Dbus_message_marshal.enable_debug_log ();

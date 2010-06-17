@@ -44,7 +44,7 @@ object
   val mutable response_sent = false
   method init =
     response_sent <- true; Mech_ok euid
-  method challenge (data : string) =
+  method challenge (_data : string) =
     if response_sent then Mech_error
     else (response_sent <- true;
           Mech_continue euid)
@@ -55,7 +55,7 @@ object
   val mutable response_sent = false
   method init =
     response_sent <- true; Mech_ok "odbus"
-  method challenge (data : string) =
+  method challenge (_data : string) =
     if response_sent then Mech_error
     else (response_sent <- true;
           Mech_continue "odbus")

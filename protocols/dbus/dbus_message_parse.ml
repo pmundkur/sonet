@@ -316,7 +316,7 @@ let unpack_headers hdr_array =
 
 let process_headers ctxt =
   let tctxt = (P.append_bytes ctxt.type_context
-                 (Buffer.contents ctxt.buffer) 0 (Buffer.length ctxt.buffer)) in
+                 (Buffer.contents ctxt.buffer) ~offset:0 ~length:(Buffer.length ctxt.buffer)) in
     (* At this point, the parsing context is where process_fixed_header
        left it, i.e. ready to parse the array. *)
   let hdr_array, tctxt = P.parse_complete_type Protocol.hdr_array_type tctxt in
@@ -397,7 +397,7 @@ let rec parse_substring state str ofs len =
             ofs len bytes_remaining bytes_to_consume;
           dbg_input str ofs len;
         let bytes_remaining = bytes_remaining - bytes_to_consume in
-        let tctxt = P.append_bytes ctxt.type_context str ofs bytes_to_consume in
+        let tctxt = P.append_bytes ctxt.type_context str ~offset:ofs ~length:bytes_to_consume in
         let tctxt = P.advance tctxt bytes_to_consume in
           ctxt.type_context <- tctxt;
           if bytes_remaining > 0
@@ -411,7 +411,7 @@ let rec parse_substring state str ofs len =
             ofs len bytes_remaining bytes_to_consume;
           dbg_input str ofs len;
         let bytes_remaining = bytes_remaining - bytes_to_consume in
-        let tctxt = P.append_bytes ctxt.type_context str ofs bytes_to_consume in
+        let tctxt = P.append_bytes ctxt.type_context str ~offset:ofs ~length:bytes_to_consume in
           ctxt.type_context <- tctxt;
           if bytes_remaining > 0
           then Parse_incomplete (In_payload (bytes_remaining, ctxt))

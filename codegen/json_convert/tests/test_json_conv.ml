@@ -112,7 +112,7 @@ let check_open_and_conv () =
 let parse_args () =
   let options = [("-print-value", Arg.Set do_print, " print output")] in
   let usage = Printf.sprintf "Usage: %s [options]" Sys.argv.(0) in
-    Arg.parse (Arg.align options) (fun f -> ()) usage
+    Arg.parse (Arg.align options) (fun _ -> ()) usage
 
 let _ =
   parse_args ();

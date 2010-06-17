@@ -22,6 +22,8 @@ EVENTLOOP_DIR = $(dir eventloop)
 HTTP_LIB_DIR = $(dir protocols/http)
 JSONRPC_LIB_DIR = $(dir protocols/jsonrpc)
 
+OCAMLFLAGS += -w Ae
+
 .SUBDIRS: eventloop
 	include OMakefile
 	export EVENTLOOP_LIB

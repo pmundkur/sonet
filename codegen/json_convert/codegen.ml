@@ -296,7 +296,7 @@ module To = struct
     fprintf ff " in@]@,"
 
   let def ff venv fn_name typ recd =
-    let fnv, venv = Var_env.new_ident_from_name venv fn_name in
+    let _fnv, venv = Var_env.new_ident_from_name venv fn_name in
     let inv, venv = Var_env.new_ident_from_name venv "o" in
     let decl = match recd with First -> "let rec" | Next -> "and" in
       fprintf ff "@[<v 8>%s %s %s =@," decl fn_name (name_of_var inv);
@@ -414,7 +414,7 @@ module From = struct
     fprintf ff " in@]@,"
 
   let def ff venv fn_name (tname, typ) recd =
-    let fnv, venv = Var_env.new_ident_from_name venv fn_name in
+    let _fnv, venv = Var_env.new_ident_from_name venv fn_name in
     let inv, venv = Var_env.new_ident_from_name venv "j" in
     let decl = match recd with First -> "let rec" | Next -> "and" in
       fprintf ff "@[<v 8>%s %s %s =@," decl fn_name (name_of_var inv);
@@ -454,7 +454,7 @@ let print_exception e =
         Printf.sprintf "Prefix \"%s\" cannot be stripped from field \"%s\"" p f
     | Pragma.Unknown_pragma p ->
         Printf.sprintf "Unable to parse pragma \"%s\"" p
-    | e ->
+    | _ ->
         Printf.sprintf "%s" (Printexc.get_backtrace ())
 
 let generate defn_list ofn ifn =
@@ -471,7 +471,7 @@ let generate defn_list ofn ifn =
                        Pragma.process_pragma ff p
                    | Type_defn (T_manifest def) ->
                        generate_one_defn ff def
-                   | Type_defn (T_abstract tname) ->
+                   | Type_defn (T_abstract _) ->
                        ()
                 ) defn_list;
       close_out oc

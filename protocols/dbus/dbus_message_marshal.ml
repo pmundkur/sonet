@@ -38,7 +38,7 @@ exception Header_not_found of M.header
 let pack_headers hdrs =
   let lookup_header_info hdr =
     let rec helper = function
-      | (h_code, h_type, h_id) :: hlist when h_id = hdr -> h_code, h_type
+      | (h_code, h_type, h_id) :: _hlist when h_id = hdr -> h_code, h_type
       | _ :: hlist -> helper hlist
       | [] -> assert false (* we currently don't support custom headers. *)
     in helper Protocol.all_headers in

@@ -91,7 +91,7 @@ let print_exception e =
           Json_parse.string_of_error e
       | Json_conv.Json_conv_error e ->
           Json_conv.string_of_error e
-      | Unknown_rpc_decl (i, j) ->
+      | Unknown_rpc_decl (i, _j) ->
           Printf.sprintf "Rpc declaration #%d is of unknown type." i
       | Invalid_rpc_decl (i, n, m) ->
           Printf.sprintf "Error parsing decl %d for %s: %s" i n m

@@ -136,7 +136,7 @@ let send conn msg =
         raise_error Connection_pending
     | Authenticating _ ->
         raise_error Authentication_pending
-    | Connected cstate ->
+    | Connected _cstate ->
         let marshaled_size = MM.compute_marshaled_size msg in
         let buffer = String.make marshaled_size '\000' in
         let marshaled_bytes = (MM.marshal_message T.Little_endian buffer

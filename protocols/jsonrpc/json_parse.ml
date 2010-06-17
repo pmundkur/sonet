@@ -154,7 +154,7 @@ let finish_value s v =
     | IArray l :: tl, _ ->
         s.stack <- IArray (v :: l) :: tl;
         s.cursor <- Expect_comma_or_end
-    | io :: tl, _ ->
+    | io :: _tl, _ ->
         raise_internal_error s ("unexpected " ^ (ivalue_to_str io)
                                 ^ " on stack at finish_value")
 
@@ -166,7 +166,7 @@ let pop_stack s =
     | IArray l :: tl ->
         s.stack <- tl;
         finish_value s (Json.Array (Array.of_list (List.rev l)))
-    | io :: tl ->
+    | io :: _tl ->
         raise_internal_error s ("unexpected " ^ (ivalue_to_str io)
                                 ^ " on stack at pop_stack")
     | [] ->
