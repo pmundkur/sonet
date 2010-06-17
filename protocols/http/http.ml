@@ -1076,17 +1076,55 @@ module Payload = struct
                      }
       | _    -> None
 
-  let parse_substring state str ofs len =
+  let can_optimize state =
+    match state.cursor with
+      | In_body  when state.remaining_length > 1L   -> true
+      | In_chunk when state.remaining_length > 1L   -> true
+      | _                                           -> false
+
+  let parse_optimized state str ofs len =
+    let len64 = Int64.of_int len in
+    let chomp64 = (if state.remaining_length <= len64
+                   then Int64.sub state.remaining_length 1L
+                   else len64) in
+    let chomp = Int64.to_int chomp64 in
+      (* dbg " chomped %d bytes in state %s...\n" chomp (string_of_cursor state.cursor); *)
+      Buffer.add_substring state.body str ofs chomp;
+      state.remaining_length <- Int64.sub state.remaining_length chomp64;
+      chomp
+
+  let parse_unoptimized state str ofs len =
     let i = ref ofs in
     let iend = ofs + len in
-      while get_parse_result state = None && !i < iend do
+      while get_parse_result state = None
+          && !i < iend
+          && not (can_optimize state)
+      do
         parse_char state str.[!i];
         incr i;
         state.num_bytes_parsed <- Int64.succ state.num_bytes_parsed
       done;
       match get_parse_result state with
-        | Some v -> Result (v, !i - ofs)
-        | None -> Parse_incomplete state
+        | Some v -> `Done (v, !i - ofs)
+        | None -> (if !i = iend
+                   then `Incomplete
+                   else `Continue_optimized (!i - ofs))
+
+  let parse_substring state str ofs len =
+    let rec helper o l acc =
+      if can_optimize state then begin
+        let chomp = parse_optimized state str o l in
+          helper (o + chomp) (l - chomp) (acc + chomp)
+      end else begin
+        match parse_unoptimized state str o l with
+          | `Done (v, consumed) ->
+              Result (v, acc + consumed)
+          | `Incomplete ->
+              Parse_incomplete state
+          | `Continue_optimized consumed ->
+              helper (o + consumed) (l - consumed) (acc + consumed)
+      end
+    in helper ofs len 0
 
   let parse state str =
     parse_substring state str 0 (String.length str)
