@@ -58,8 +58,8 @@ module Var_env = struct
                                        with Not_found -> new_name_entry) full_name in
       var, (StringMap.add full_name new_entry env)
 
-  let new_ident_from_name env ?(prefix="") ?(suffix="") stem =
-    new_var env (prefix ^ stem ^ suffix)
+  let new_ident_from_name env ?(api = false) ?(prefix="") ?(suffix="") stem =
+    new_var env ((if api then "" else "_") ^ prefix ^ stem ^ suffix)
 
   let new_idents_from_names env ?(prefix="") ?(suffix="") names =
     let vlist, env =
@@ -190,7 +190,7 @@ module Server = struct
         fprintf ff "%s.%s %s %s@]@," impl_module methname args_str cbvn
 
   let gen_notification_dispatch ff venv _server impl_module nlist =
-    let dispv, venv = Var_env.new_ident_from_name venv "dispatch_notification" in
+    let dispv, venv = Var_env.new_ident_from_name ~api:true venv "dispatch_notification" in
     let reqv, venv = Var_env.new_ident_from_name venv "req" in
     let cbv, venv = Var_env.new_ident_from_name venv "callback_arg" in
     let implv, venv = Var_env.new_ident_from_name venv impl_module in
@@ -201,7 +201,7 @@ module Server = struct
       fprintf ff "| _ -> raise (Jsonrpc.Unknown_request %s.Jsonrpc.method_name)@]@,@\n" reqvn
 
   let gen_rpc_dispatch ff venv server impl_module rpcs =
-    let dispv, venv = Var_env.new_ident_from_name venv "dispatch_rpc" in
+    let dispv, venv = Var_env.new_ident_from_name ~api:true venv "dispatch_rpc" in
     let reqidjv, venv = Var_env.new_ident_from_name venv "req_id_j" in
     let reqv, venv = Var_env.new_ident_from_name venv "req" in
     let implv, venv = Var_env.new_ident_from_name venv impl_module in

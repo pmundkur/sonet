@@ -159,7 +159,7 @@ let notification_invoke testname req =
     (* iii) check whether we have a response to send back *)
     (match resp_j with
        | None -> ()
-       | Some j -> raise (Failure (Printf.sprintf "unexpected response in test %s" testname)))
+       | Some _j -> raise (Failure (Printf.sprintf "unexpected response in test %s" testname)))
 
 
 let default_id_check req_id resp_id =
@@ -167,7 +167,7 @@ let default_id_check req_id resp_id =
     | None -> if not (Json.is_null resp_id) then raise (Failure "unexpected non-null resp id received")
     | Some id -> if (id <> resp_id) then raise (Failure "resp id differs from req id")
 
-let default_error_check e =
+let default_error_check _e =
   raise (Failure "unexpected rpc error received.")
 
 let test_invoke req ?(id_check=default_id_check) ?(error_check=default_error_check) result_check =
@@ -181,7 +181,7 @@ let test_invoke req ?(id_check=default_id_check) ?(error_check=default_error_che
 
 let test_server () =
   let req0_checker test_id () =
-    let req, rpcid, resp_fn = C.jrpc_request0 () in
+    let req, _rpcid, resp_fn = C.jrpc_request0 () in
     let exp_resp = S.req0_handler () () in
     let resp_to_str r = match r with |None -> "None" | Some b -> if b then "Some true" else "Some false" in
     let resp_checker r =
@@ -196,7 +196,7 @@ let test_server () =
 
 
   let req1_checker test_id arg1 =
-    let req, rpcid, resp_fn = C.jrpc_request1 arg1 in
+    let req, _rpcid, resp_fn = C.jrpc_request1 arg1 in
     let exp_resp = S.req1_handler arg1 () in
     let resp_to_str r = match r with |None -> "None" | Some b -> if b then "Some true" else "Some false" in
     let resp_checker r =
@@ -210,7 +210,7 @@ let test_server () =
   in
 
   let req2_checker test_id arg1 arg2 arg3 =
-    let req, rpcid, resp_fn = C.jrpc_request2 arg1 arg2 arg3 in
+    let req, _rpcid, resp_fn = C.jrpc_request2 arg1 arg2 arg3 in
     let exp_resp = S.req2_handler arg1 arg2 arg3 () in
     let resp_checker r =
       let got_resp = resp2_type_of_json r in
