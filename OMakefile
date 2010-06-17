@@ -7,9 +7,16 @@ else
 	CMA = cma
 	export
 
+# To enable profiling, define PROFILE_BUILD in the environment.
+if $(defined-env PROFILE_BUILD)
+	BYTE_ENABLED = true
+	NATIVE_ENABLED = false
+	OCAMLC=ocamlcp
+	export
+
 BASE = $(dir .)
 
-CLEAN = rm -f *.annot *.cmi *.cmo *.cmxa *.cmx *.o *.a *.opt
+CLEAN = rm -f *.annot *.cmi *.cmo *.cma *.cmxa *.cmx *.o *.a *.opt ocamlprof.dump
 
 EVENTLOOP_DIR = $(dir eventloop)
 HTTP_LIB_DIR = $(dir protocols/http)
