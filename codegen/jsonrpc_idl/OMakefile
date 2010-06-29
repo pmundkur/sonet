@@ -1,7 +1,7 @@
 syntax_json_conv.ml: syntax.ml $(JSON_CONVERT)
 	$(JSON_CONVERT_DIR)/$(JSON_CONVERT_PROG) -i $< -o $@
 
-OCAMLFLAGS += -I $(JSONRPC_LIB_DIR)
+OCAMLINCLUDES += $(JSONRPC_LIB_DIR)
 
 GEN_RPC_FILES[] =
 	syntax

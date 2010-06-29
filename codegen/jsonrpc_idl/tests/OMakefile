@@ -1,10 +1,9 @@
-rpc_types_json_conv.ml: rpc_types.ml $(JSON_CONVERT) $(JSONRPC_LIB)
+OCAMLINCLUDES += $(JSONRPC_LIB_DIR)
+rpc_types_json_conv.ml: rpc_types.ml $(JSON_CONVERT)
 	$(JSON_CONVERT_DIR)/$(JSON_CONVERT_PROG) -i $< -o $@
 
 rpc_one.ml rpc_two.ml: rpc_defns.json $(GEN_RPC)
 	$(JSONRPC_IDL_DIR)/$(GEN_RPC_PROG)  -o 'one:rpc_one.ml' -o 'two:rpc_two.ml' $<
-
-OCAMLFLAGS += -I $(JSONRPC_LIB_DIR)
 
 RPC_TEST_FILES[] =
 	rpc_types

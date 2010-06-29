@@ -30,7 +30,6 @@ platform_stubs.o: platform_stubs.c
 OCAML_LIB_FLAGS += $(absname $(addsuffix .o, $(DBUS_C_FILES)))
 
 DBUS_LIB = $(OCamlLibrary $(LIB), $(DBUS_O_FILES))
-$(DBUS_LIB): $(EVENTLOOP_LIB)
 
 .DEFAULT: $(DBUS_LIB)
 

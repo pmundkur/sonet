@@ -1,4 +1,4 @@
-OCAMLFLAGS += -I $(JSONRPC_LIB_DIR)
+OCAMLINCLUDES[] += $(JSONRPC_LIB_DIR)
 
 test_types_json_conv.ml: test_types.ml $(JSON_CONVERT)
 	$(JSON_CONVERT_DIR)/$(JSON_CONVERT_PROG) -i $< -o $@
