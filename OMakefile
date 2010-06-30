@@ -22,6 +22,6 @@ EVENTLOOP_DIR = $(dir eventloop)
 HTTP_LIB_DIR = $(dir protocols/http)
 JSONRPC_LIB_DIR = $(dir protocols/jsonrpc)
 
-OCAMLFLAGS += -w Ae
+OCAMLFLAGS[] += -w Ae -dtypes
 
 .SUBDIRS: eventloop protocols/dbus protocols/http protocols/jsonrpc codegen

@@ -1,5 +1,4 @@
-OCAMLFLAGS += -dtypes -g
-OCAMLINCLUDES += $(EVENTLOOP_DIR)
+OCAMLINCLUDES[] += $(EVENTLOOP_DIR)
 
 DBUS_O_FILES[] =
 	dbus_type
@@ -27,7 +26,7 @@ platform.$(CMO) platform.o : platform_stubs.o
 platform_stubs.o: platform_stubs.c
 	$(OCAMLC) -c -o $@ $^
 
-OCAML_LIB_FLAGS += $(absname $(addsuffix .o, $(DBUS_C_FILES)))
+OCAML_LIB_FLAGS[] += $(absname $(addsuffix .o, $(DBUS_C_FILES)))
 
 DBUS_LIB = $(OCamlLibrary $(LIB), $(DBUS_O_FILES))
 

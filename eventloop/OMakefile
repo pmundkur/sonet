@@ -3,7 +3,7 @@
 OCAMLPACKS[] =
 	unix
 
-OCAMLFLAGS += -g -dtypes -w A
+OCAMLFLAGS[] += -w A
 
 O_FILES[] =
 	eventloop
@@ -23,7 +23,7 @@ epoll_poller.$(CMO) epoll_poller.o : epoll_stubs.o
 epoll_stubs.o: epoll_stubs.c
 	$(OCAMLC) -c -o $@ $^
 
-OCAML_LIB_FLAGS += $(absname $(addsuffix .o, $(C_FILES)))
+OCAML_LIB_FLAGS[] += $(absname $(addsuffix .o, $(C_FILES)))
 
 EVENTLOOP_LIB = $(OCamlLibrary $(LIB), $(O_FILES))
 

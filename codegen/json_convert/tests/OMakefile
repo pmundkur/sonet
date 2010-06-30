@@ -1,5 +1,6 @@
 OCAMLINCLUDES[] += $(JSONRPC_LIB_DIR)
 
+LocalOCamlGeneratedFiles(test_types_json_conv.ml)
 test_types_json_conv.ml: test_types.ml $(JSON_CONVERT)
 	$(JSON_CONVERT_DIR)/$(JSON_CONVERT_PROG) -i $< -o $@
 
@@ -8,9 +9,7 @@ TESTER_FILES[] =
 	test_types_json_conv
 	test_json_conv
 
-OCAML_LIBS[] +=
-	 $(JSONRPC_LIB_DIR)/jsonrpc
-
+OCAML_LIBS[] = $(JSONRPC_LIB_DIR)/jsonrpc
 TESTER_PROG = test_json_conv
 TESTER = $(OCamlProgram $(TESTER_PROG), $(TESTER_FILES))
 

@@ -1,4 +1,7 @@
-OCAMLINCLUDES += $(JSONRPC_LIB_DIR)
+GEN_FILES = rpc_types_json_conv.ml rpc_one.ml rpc_two.ml
+
+OCamlGeneratedFiles($(GEN_FILES))
+
 rpc_types_json_conv.ml: rpc_types.ml $(JSON_CONVERT)
 	$(JSON_CONVERT_DIR)/$(JSON_CONVERT_PROG) -i $< -o $@
 
@@ -12,9 +15,6 @@ RPC_TEST_FILES[] =
 	rpc_two
 	test_rpc
 
-
-OCAML_LIBS = $(JSONRPC_LIB_DIR)/jsonrpc
-
 RPC_TEST_PROG = test_rpc
 RPC_TEST = $(OCamlProgram $(RPC_TEST_PROG), $(RPC_TEST_FILES))
 
@@ -22,4 +22,4 @@ RPC_TEST = $(OCamlProgram $(RPC_TEST_PROG), $(RPC_TEST_FILES))
 
 .PHONY: clean
 clean:
-	$(CLEAN) $(RPC_TEST) rpc_types_json_conv.ml rpc_one.ml rpc_two.ml
+	$(CLEAN) $(RPC_TEST) $(GEN_FILES)
