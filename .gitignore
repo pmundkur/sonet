@@ -1,4 +1,11 @@
 .omakedb*
 OMakefile.omc
 OMakeroot.omc
+*.cmi
+*.cmx
+*.cmxa
+*.o
+*.a
+*.opt
+*.annot
 
