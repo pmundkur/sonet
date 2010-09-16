@@ -44,6 +44,8 @@ val disable_recv : t -> unit
 val connect : t -> Unix.sockaddr -> unit
 
 val send : t -> string -> unit
+val send_substring : t -> string -> (* offset *) int -> (* length *) int -> unit
+val send_buffer : t -> Buffer.t -> unit
 val has_pending_send : t -> bool
 
 val set_callbacks : t -> callbacks -> unit

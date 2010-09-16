@@ -154,6 +154,14 @@ let send conn s =
   Buffer.add_string conn.send_buf s;
   Eventloop.enable_send conn.ev_loop conn.ev_handle
 
+let send_substring conn s off len =
+  Buffer.add_substring conn.send_buf s off len;
+  Eventloop.enable_send conn.ev_loop conn.ev_handle
+
+let send_buffer conn b =
+  Buffer.add_buffer conn.send_buf b;
+  Eventloop.enable_send conn.ev_loop conn.ev_handle
+
 let has_pending_send conn =
   Buffer.length conn.send_buf > 0
 
