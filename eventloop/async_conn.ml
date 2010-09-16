@@ -171,3 +171,4 @@ let set_callbacks conn callbacks =
 let get_handle conn = conn.ev_handle
 let get_eventloop conn = conn.ev_loop
 let get_fd conn = conn.ev_fd
+let get_send_buf conn = conn.send_buf

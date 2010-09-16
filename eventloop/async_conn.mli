@@ -53,3 +53,4 @@ val set_callbacks : t -> callbacks -> unit
 val get_handle : t -> Eventloop.handle
 val get_eventloop : t -> Eventloop.t
 val get_fd : t -> Unix.file_descr
+val get_send_buf : t -> Buffer.t
