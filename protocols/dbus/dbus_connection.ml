@@ -149,27 +149,27 @@ let send conn msg =
 
 let attach ev_loop fd ?(connected=false) callbacks =
   let acallbacks = {
-    Async_conn.connect_callback   = connect_callback;
-    Async_conn.recv_callback      = recv_callback;
-    Async_conn.send_done_callback = send_done_callback;
-    Async_conn.shutdown_callback  = shutdown_callback;
-    Async_conn.error_callback     = error_callback;
+    C.connect_callback   = connect_callback;
+    C.recv_callback      = recv_callback;
+    C.send_done_callback = send_done_callback;
+    C.shutdown_callback  = shutdown_callback;
+    C.error_callback     = error_callback;
   } in
-  let aconn = Async_conn.attach ev_loop fd acallbacks in
+  let aconn = C.attach ev_loop fd acallbacks in
   let dconn = {
     conn      = aconn;
     callbacks = callbacks;
     state     = Connecting;
     server_address = "";
   } in
-    Conns.add_conn (Async_conn.get_handle aconn) dconn;
+    Conns.add_conn (C.get_handle aconn) dconn;
     if connected then connect_callback aconn;
     dconn
 
 let detach conn =
-  Async_conn.detach conn.conn;
+  C.detach conn.conn;
   conn.state <- Disconnected
 
 let close conn =
-  Async_conn.close conn.conn;
+  C.close conn.conn;
   conn.state <- Disconnected
