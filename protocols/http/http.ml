@@ -16,7 +16,7 @@
 let verbose = ref false
 
 let dbg fmt =
-  let logger s = if !verbose then Printf.printf "%s" s in
+  let logger s = if !verbose then Printf.printf "%s\n%!" s in
     Printf.ksprintf logger fmt
 
 let optval = function | Some v -> v | None -> assert false
@@ -148,7 +148,7 @@ module Headers = struct
 
   let raise_bad_char s c = raise_error (Parse_error (s.cursor, c))
   let parse_char s c =
-    (* dbg "parsing %C in state %s...\n" c (string_of_cursor s.cursor); *)
+    (* dbg "parsing %C in state %s..." c (string_of_cursor s.cursor); *)
       match s.cursor with
         | Start_header ->
             (match c with
@@ -335,7 +335,7 @@ module Request_header = struct
 
   let raise_bad_char s c = raise_error (Parse_error (s.cursor, c))
   let parse_char s c =
-    (* dbg "parsing %C in state %s...\n" c (string_of_cursor s.cursor); *)
+    (* dbg "parsing %C in state %s..." c (string_of_cursor s.cursor); *)
       match s.cursor with
         | Start ->
             if is_token_char c then s.cursor <- In_method [ c ]
@@ -668,7 +668,7 @@ module Response_header = struct
 
   let raise_bad_char s c = raise_error (Parse_error (s.cursor, c))
   let parse_char s c =
-    (* dbg "parsing %C in state %s...\n" c (string_of_cursor s.cursor); *)
+    (* dbg "parsing %C in state %s..." c (string_of_cursor s.cursor); *)
       match s.cursor with
         | Start ->
             if is_token_char c then s.cursor <- In_version [ c ]
@@ -987,7 +987,7 @@ module Payload = struct
 
   let raise_bad_char s c = raise_error (Parse_error (s.cursor, c))
   let parse_char s c =
-    (* dbg "parsing %C in state %s...\n" c (string_of_cursor s.cursor); *)
+    (* dbg "parsing %C in state %s..." c (string_of_cursor s.cursor); *)
       match s.cursor with
         | In_body ->
             check_payload_callback s false;
@@ -1088,7 +1088,7 @@ module Payload = struct
                    then Int64.sub state.remaining_length 1L
                    else len64) in
     let chomp = Int64.to_int chomp64 in
-      (* dbg " chomped %d bytes in state %s...\n" chomp (string_of_cursor state.cursor); *)
+      (* dbg " chomped %d bytes in state %s..." chomp (string_of_cursor state.cursor); *)
       Buffer.add_substring state.body str ofs chomp;
       state.remaining_length <- Int64.sub state.remaining_length chomp64;
       chomp
