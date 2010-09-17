@@ -74,23 +74,23 @@ let send_ready_callback _el h fd =
   let conn = Conns.get_conn h in
   let payload = Buffer.contents conn.send_buf in
   let payload_len = String.length payload in
-    (try
-       (match Unix.write fd payload 0 payload_len with
-          | 0 -> ()
-          | sent ->
-              dbg "-> %s" (String.sub payload 0 sent);
-              Buffer.clear conn.send_buf;
-              Buffer.add_substring conn.send_buf payload sent (payload_len - sent)
-       );
-       
-     with
-       | Unix.Unix_error (Unix.EWOULDBLOCK, _, _)
-       | Unix.Unix_error (Unix.EAGAIN, _, _)
-       | Unix.Unix_error (Unix.EINTR, _, _) ->
-           ()
-       | Unix.Unix_error (ec, f, s) ->
-           conn.callbacks.error_callback conn (ec, f, s)
-    );
+    if payload_len > 0 then begin
+      try
+	(match Unix.write fd payload 0 payload_len with
+	   | 0 -> ()
+	   | sent ->
+	       dbg "-> %s" (String.sub payload 0 sent);
+	       Buffer.clear conn.send_buf;
+	       Buffer.add_substring conn.send_buf payload sent (payload_len - sent)
+	)
+      with
+	| Unix.Unix_error (Unix.EWOULDBLOCK, _, _)
+	| Unix.Unix_error (Unix.EAGAIN, _, _)
+	| Unix.Unix_error (Unix.EINTR, _, _) ->
+	    ()
+	| Unix.Unix_error (ec, f, s) ->
+	    conn.callbacks.error_callback conn (ec, f, s)
+    end;
     (* We may need to invoke the send_done_callback, but we may
        have dispatched an error_callback above.  So we need to ensure
        the connection is still active.
