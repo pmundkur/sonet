@@ -136,7 +136,8 @@ let close conn =
   (try Unix.close conn.ev_fd with _ -> ())
 
 let enable_send_done conn =
-  conn.send_done_enabled <- true
+  conn.send_done_enabled <- true;
+  Eventloop.enable_send conn.ev_loop conn.ev_handle
 
 let disable_send_done conn =
   conn.send_done_enabled <- false
