@@ -19,9 +19,14 @@ let dbg fmt =
   let logger s = if !verbose then Printf.printf "%s\n%!" s
   in Printf.ksprintf logger fmt
 
-module ConnMap = Map.Make (struct type t = Unix.file_descr let compare = compare end)
+module ConnMap = Map.Make (struct
+                             type t = Unix.file_descr
+                             let compare = compare
+                           end)
 
-(* A module that supports finding a timer by handle as well as by expiry time. *)
+(* A module that supports finding a timer by handle as well as by
+   expiry time.
+*)
 module Timers = struct
 
   type 'a entry = {
@@ -30,34 +35,37 @@ module Timers = struct
     value : 'a;
   }
 
-  module Timers_by_expiry = Map.Make (struct type t = float let compare = compare end)
+  module By_expiry = Map.Make (struct
+                                 type t = float
+                                 let compare = compare
+                               end)
 
   type 'a t = {
-    mutable by_expiry : (('a entry) list) Timers_by_expiry.t;
+    mutable by_expiry : (('a entry) list) By_expiry.t;
   }
 
-  let create () = { by_expiry = Timers_by_expiry.empty }
+  let create () = { by_expiry = By_expiry.empty }
 
-  let is_empty t = Timers_by_expiry.is_empty t.by_expiry
+  let is_empty t = By_expiry.is_empty t.by_expiry
 
   let next_handle = ref 0
 
   let add_timer t at v =
     incr next_handle;
     let e = { handle = !next_handle; expires_at = at; value = v } in
-    let es = (try Timers_by_expiry.find e.expires_at t.by_expiry
+    let es = (try By_expiry.find e.expires_at t.by_expiry
 	      with Not_found -> [])
     in
-      t.by_expiry <- Timers_by_expiry.add e.expires_at (e :: es) t.by_expiry;
+      t.by_expiry <- By_expiry.add e.expires_at (e :: es) t.by_expiry;
       e
 
   let remove_timer t entry =
     let handle = entry.handle in
-    let es = Timers_by_expiry.find entry.expires_at t.by_expiry in
+    let es = By_expiry.find entry.expires_at t.by_expiry in
     let es = List.filter (fun e' -> e'.handle <> handle) es in
       t.by_expiry <- (match es with
-                        | [] -> Timers_by_expiry.remove entry.expires_at t.by_expiry
-                        | _  -> Timers_by_expiry.add entry.expires_at es t.by_expiry
+                        | [] -> By_expiry.remove entry.expires_at t.by_expiry
+                        | _  -> By_expiry.add entry.expires_at es t.by_expiry
                      )
 
   exception Found of float
@@ -68,7 +76,7 @@ module Timers = struct
     try
       (* This should give the earliest expiry time,
          since iteration is done in increasing order. *)
-      Timers_by_expiry.iter (fun tim -> raise (Found tim)) t.by_expiry;
+      By_expiry.iter (fun tim -> raise (Found tim)) t.by_expiry;
       raise Not_found
     with Found tim -> tim
 
@@ -76,8 +84,8 @@ module Timers = struct
      those timers *)
   let extract_timers_at t tim =
     try
-      let es = Timers_by_expiry.find tim t.by_expiry in
-        t.by_expiry <- Timers_by_expiry.remove tim t.by_expiry;
+      let es = By_expiry.find tim t.by_expiry in
+        t.by_expiry <- By_expiry.remove tim t.by_expiry;
         List.map (fun e -> e.value) es
     with Not_found -> []
 
@@ -125,7 +133,8 @@ and t = {
 let inited = ref false
 let init () =
   if not !inited then begin
-    Callback.register_exception "onet.unix_error_exception" (Unix.Unix_error (Unix.EEXIST, "string", "string"));
+    Callback.register_exception "onet.unix_error_exception"
+      (Unix.Unix_error (Unix.EEXIST, "string", "string"));
     inited := true
   end
 
@@ -314,9 +323,15 @@ let dispatch t interval =
       (* the blocking interval for select is the smaller of the
          specified interval, and the interval before which the
          earliest timer expires.  *)
-      let block_until = if interval > 0.0 then t.current_time +. interval else t.current_time in
+      let block_until =
+        if interval > 0.0
+        then t.current_time +. interval
+        else t.current_time in
       let first_expiry = Timers.get_first_expiry_time t.timers in
-      let block_until = (if first_expiry < block_until then first_expiry else block_until) in
+      let block_until =
+        if first_expiry < block_until
+        then first_expiry
+        else block_until in
       let interval = block_until -. t.current_time in
         if interval < 0.0 then 0.0 else interval
   in
