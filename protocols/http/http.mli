@@ -212,6 +212,7 @@ module Request : sig
     | Error of string
   val parse : state -> string -> parse_result
   val parse_substring : state -> string -> (* offset *) int -> (* len *) int -> parse_result
+  val get_parse_result : state -> t option
 
   val connection_closed : state -> unit
 
@@ -239,6 +240,7 @@ module Response : sig
     | Error of string
   val parse : state -> string -> parse_result
   val parse_substring : state -> string -> (* offset *) int -> (* len *) int -> parse_result
+  val get_parse_result : state -> t option
 
   val connection_closed : state -> unit
 

@@ -1252,6 +1252,14 @@ module Request = struct
   let parse state str =
     parse_substring state str 0 (String.length str)
 
+  let get_parse_result state =
+    match state.cursor with
+      | In_payload ps ->
+          (match Payload.get_parse_result ps with
+             | None -> None
+             | Some p -> Some { request = optval state.s_request; payload = Some p })
+      | _ -> None
+
   let connection_closed state =
     match state.cursor with
       | In_request_header _ -> ()
@@ -1361,6 +1369,14 @@ module Response = struct
 
   let parse state str =
     parse_substring state str 0 (String.length str)
+
+  let get_parse_result state =
+    match state.cursor with
+      | In_payload ps ->
+          (match Payload.get_parse_result ps with
+             | None -> None
+             | Some p -> Some { response = optval state.s_response; payload = Some p })
+      | _ -> None
 
   let connection_closed state =
     match state.cursor with
