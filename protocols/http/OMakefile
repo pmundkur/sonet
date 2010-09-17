@@ -1,7 +1,12 @@
+OCAMLINCLUDES[] += $(EVENTLOOP_DIR)
+
+OCAML_LIBS[] = $(EVENTLOOP_DIR)/eventloop
+
 FILES[] =
 	httputils
 	uri
 	http
+	http_client_conn
 
 LIB = http
 HTTP_LIB = $(OCamlLibrary $(LIB), $(FILES))

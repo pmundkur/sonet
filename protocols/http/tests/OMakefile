@@ -9,8 +9,11 @@ OCAML_OTHER_LIBS[] +=
 TEST_PARSER_PROG = test_http
 TEST_PARSER = $(OCamlProgram $(TEST_PARSER_PROG), test_http)
 
-.DEFAULT: $(TEST_PARSER)
+TEST_CONN_PROG = test_http_conn
+TEST_CONN = $(OCamlProgram $(TEST_CONN_PROG), test_http_conn)
+
+.DEFAULT: $(TEST_PARSER) $(TEST_CONN)
 
 .PHONY: clean
 clean:
-	$(CLEAN) $(TEST_PARSER)
+	$(CLEAN) $(TEST_PARSER) $(TEST_CONN)
