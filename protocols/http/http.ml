@@ -1112,7 +1112,7 @@ module Payload = struct
 
   let parse_substring state str ofs len =
     let rec helper o l acc =
-      if can_optimize state then begin
+      if can_optimize state && l > 0 then begin
         let chomp = parse_optimized state str o l in
           helper (o + chomp) (l - chomp) (acc + chomp)
       end else begin
