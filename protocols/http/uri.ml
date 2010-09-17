@@ -130,7 +130,7 @@ let remove_dot_segments path =
   let out_segs = remove (Str.split slash path) [] in
   let out = String.concat "/" out_segs in
   let out = if has_leading_slash then "/" ^ out else out in
-    if has_trailing_slash then out ^ "/" else out
+    if has_trailing_slash && path <> "/" then out ^ "/" else out
 
 (* Regular expression for authority = [userinfo "@"] host [":" port] *)
 let auth_re = "\\(\\([^@]*\\)@\\)?\\([^:]*\\)\\(:\\([0-9]*\\)\\)?"
