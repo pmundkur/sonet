@@ -1,6 +1,6 @@
 (**************************************************************************)
 (*                                                                        *)
-(*  Copyright (C) 2010x1      Prashanth Mundkur.                          *)
+(*  Copyright (C) 2010      Prashanth Mundkur.                            *)
 (*  Author  Prashanth Mundkur <prashanth.mundkur _at_ gmail.com>          *)
 (*                                                                        *)
 (*  This program is free software; you can redistribute it and/or         *)
