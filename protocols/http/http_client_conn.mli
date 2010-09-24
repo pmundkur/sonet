@@ -15,37 +15,48 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type t
+module type CallbackType = sig type t end
 
-type token = int
+module type Conn =
+sig
 
-type payload_send_callback = unit -> bool * string * (* offset *) int * (* length *) int
-type payload_recv_callback = Http.payload_callback
+  type t
+  type callback
 
-type error =
-  | Error_eventloop of Eventloop.error
-  | Error_http of token * string
+  type payload_send_callback =
+      unit -> bool * string * (* offset *) int * (* length *) int
+  type payload_recv_callback = Http.payload_callback
 
-val string_of_error : error -> string
+  type request =
+    | Small of Http.Request.t
+    | StreamingSend of Http.Request_header.t * payload_send_callback
+    | StreamingRecv of Http.Request.t * payload_recv_callback
+    | Streaming of (Http.Request_header.t
+		    * payload_send_callback
+		    * payload_recv_callback)
 
-type request =
-  | Small of Http.Request.t
-  | StreamingSend of Http.Request_header.t * payload_send_callback
-  | StreamingRecv of Http.Request.t * payload_recv_callback
-  | Streaming of (Http.Request_header.t
-		  * payload_send_callback
-		  * payload_recv_callback)
+  val send_request : t -> request -> callback -> unit
 
-val send_request : t -> request -> token
+  type error =
+    | Error_eventloop of Eventloop.error
+    | Error_http of callback * string
 
-type callbacks = {
-  connect_callback : t -> unit;
-  response_header_callback : t -> token -> Http.Response_header.t -> unit;
-  response_callback : t -> token -> Http.Response.t -> unit;
-  shutdown_callback : t -> unit;
-  error_callback : t -> error -> unit;
-}
+  val string_of_error : error -> string
 
-val connect : Eventloop.t -> Unix.sockaddr -> callbacks -> t
-val detach : t -> unit
-val close : t -> unit
+  type callbacks = {
+    (* called only for StreamingRecv and Streaming requests *)
+    response_header_callback : callback -> t -> Http.Response_header.t -> unit;
+    (* called only for Small and StreamingSend requests *)
+    response_callback : callback -> t -> Http.Response.t -> unit;
+
+    connect_callback : t -> unit;
+    shutdown_callback : t -> unit;
+    error_callback : t -> error -> unit;
+  }
+
+  val connect : Eventloop.t -> Unix.sockaddr -> callbacks -> t
+  val detach : t -> unit
+  val close : t -> unit
+end
+
+module Make (Callback : CallbackType) : Conn with type callback = Callback.t

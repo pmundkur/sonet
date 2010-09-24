@@ -16,7 +16,9 @@
 (**************************************************************************)
 
 module H = Http
-module Client = Http_client_conn
+
+module Callback = struct type t = int end
+module Client = Http_client_conn.Make(Callback)
 
 let unopt = function
   | None -> assert false
@@ -78,7 +80,7 @@ let get_url el u p =
     Client.response_header_callback =
       (fun _ _ rhdr -> log_resphdr u rhdr);
     Client.response_callback =
-      (fun t _ resp ->
+      (fun _ t resp ->
          log_resp u resp ~show_payload:false;
          Client.close t);
     Client.shutdown_callback =
@@ -95,8 +97,8 @@ let get_url el u p =
           let t = Client.connect el (Unix.ADDR_INET (a, p)) cbs in
           let req = make_small t u in
           let sreq = make_stream_recv t u in
-            ignore (Client.send_request t req);
-            ignore (Client.send_request t sreq)
+            ignore (Client.send_request t req 0);
+            ignore (Client.send_request t sreq 1)
 
 let run () =
   let el = Eventloop.create () in

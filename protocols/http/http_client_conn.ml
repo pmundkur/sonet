@@ -19,305 +19,340 @@
    - handle 100 continue
 *)
 
-module C = Async_conn
 module H = Http
 
-type token = int
+module type CallbackType = sig type t end
 
-type payload_send_callback =
-    unit -> bool * string * (* offset *) int * (* length *) int
-type payload_recv_callback = H.payload_callback
+module type Conn =
+sig
 
-type error =
-  | Error_eventloop of Eventloop.error
-  | Error_http of token * string
+  type t
+  type callback
 
-type send_state =
-  | Send_start
-  | Send_payload
+  type payload_send_callback = unit -> bool * string * int * int
+  type payload_recv_callback = H.payload_callback
 
-type recv_state =
-  | Empty
-  | Normal of H.Response.state
-  | Headers of H.Response_header.state
-  | Payload of H.Payload.state
+  type request =
+    | Small of H.Request.t
+    | StreamingSend of H.Request_header.t * payload_send_callback
+    | StreamingRecv of H.Request.t * payload_recv_callback
+    | Streaming of (H.Request_header.t
+                    * payload_send_callback
+                    * payload_recv_callback)
 
-type t = {
-  conn : C.t;
-  callbacks : callbacks;
-  mutable closed : bool;
+  val send_request : t -> request -> callback -> unit
 
-  (* requests waiting to be sent, in order *)
-  mutable send_queue : request Queue.t;
-  mutable send_token : token;
-  mutable send_state : send_state;
+  type error =
+    | Error_eventloop of Eventloop.error
+    | Error_http of callback * string
 
-  (* requests awaiting responses, in order *)
-  mutable recv_queue : request Queue.t;
-  mutable recv_state : recv_state;
-  mutable recv_token : token;
-}
+  val string_of_error : error -> string
 
-and request =
-  | Small of H.Request.t
-  | StreamingSend of H.Request_header.t * payload_send_callback
-  | StreamingRecv of H.Request.t * payload_recv_callback
-  | Streaming of (H.Request_header.t
-                  * payload_send_callback
-                  * payload_recv_callback)
+  type callbacks = {
+    (* called only for StreamingRecv and Streaming requests *)
+    response_header_callback : callback -> t -> Http.Response_header.t -> unit;
+    (* called only for Small and StreamingSend requests *)
+    response_callback : callback -> t -> Http.Response.t -> unit;
 
-and callbacks = {
-  connect_callback : t -> unit;
-  response_header_callback : t -> token -> H.Response_header.t -> unit;
-  response_callback : t -> token -> H.Response.t -> unit;
-  shutdown_callback : t -> unit;
-  error_callback : t -> error -> unit;
-}
+    connect_callback : t -> unit;
+    shutdown_callback : t -> unit;
+    error_callback :  t -> error -> unit;
+  }
 
-module Conns = Conn_map.Make(struct type conn = t end)
+  val connect : Eventloop.t -> Unix.sockaddr -> callbacks -> t
+  val detach : t -> unit
+  val close : t -> unit
+end
 
-let connect_callback conn =
-  let t = Conns.get_conn (C.get_handle conn) in
-    t.callbacks.connect_callback t
+module C = Async_conn
 
-let error_callback conn e =
-  let t = Conns.get_conn (C.get_handle conn) in
-    t.callbacks.error_callback t (Error_eventloop e)
+module Make (Callback : CallbackType) = struct
 
-let send_request t req =
-  let token = t.send_token in
-    Queue.add req t.send_queue;
-    C.enable_send_done t.conn;
-    t.send_token <- token + 1;
-    token
+  type callback = Callback.t
 
-let adjust_recv_state t =
-  if not t.closed then
-    if Queue.is_empty t.recv_queue then begin
-      C.disable_recv t.conn;
-      t.recv_state <- Empty;
-    end else begin
-      C.enable_recv t.conn;
-      match Queue.top t.recv_queue with
-        | Small _
-        | StreamingSend _ ->
-            t.recv_state <- Normal (H.Response.init_state ())
-        | StreamingRecv _
-        | Streaming _ ->
-            t.recv_state <- Headers (H.Response_header.init_state ())
-    end
+  type error =
+    | Error_eventloop of Eventloop.error
+    | Error_http of callback * string
 
-let prepare_for_next_response t =
-  ignore (Queue.pop t.recv_queue);
-  t.recv_token <- t.recv_token + 1;
-  adjust_recv_state t
+  type send_state =
+    | Send_start
+    | Send_payload
 
-let append_to_recv_queue t req =
-  Queue.add req t.recv_queue;
-  if t.recv_state = Empty then adjust_recv_state t
+  type recv_state =
+    | Empty
+    | Normal of H.Response.state * callback
+    | Headers of H.Response_header.state * callback
+    | Payload of H.Payload.state * callback
 
-let send_done_callback conn =
-  let t = Conns.get_conn (C.get_handle conn) in
-    match Queue.is_empty t.send_queue with
-      | true ->
-          assert (t.send_state = Send_start);
-          C.disable_send_done t.conn
-      | false ->
-          let top = Queue.top t.send_queue in
-            match (t.send_state, top) with
-              | Send_start, Small req
-              | Send_start, StreamingRecv (req, _) ->
-                  H.Request.serialize (C.get_send_buf t.conn) req;
-                  C.enable_send_done t.conn;
-                  append_to_recv_queue t (Queue.pop t.send_queue)
-              | Send_start, StreamingSend (reqhdr, _)
-              | Send_start, Streaming (reqhdr, _, _) ->
-                  H.Request_header.serialize (C.get_send_buf t.conn) reqhdr;
-                  C.enable_send_done t.conn;
-                  t.send_state <- Send_payload;
-                  (* We might get a response before we finish sending
-                     the request payload, so put the request on the
-                     recv_queue now. *)
-                  append_to_recv_queue t top;
-              | Send_payload, Small _
-              | Send_payload, StreamingRecv _ ->
-                  assert false
-              | Send_payload, StreamingSend (_, scb)
-              | Send_payload, Streaming (_, scb, _) ->
-                  let fin, payload, off, len = scb () in
-                    C.send_substring t.conn payload off len;
-                    if fin then begin
-                      ignore (Queue.pop t.send_queue);
-                      t.send_state <- Send_start;
-                    end
+  type payload_send_callback = unit -> bool * string * int * int
+  type payload_recv_callback = H.payload_callback
 
-let get_payload_callback t =
-  match Queue.top t.recv_queue with
-    | Small _
-    | StreamingSend _ ->
-        assert false
-    | StreamingRecv (_, prcb)
-    | Streaming (_, _, prcb) ->
-        prcb
+  type request =
+    | Small of H.Request.t
+    | StreamingSend of H.Request_header.t * payload_send_callback
+    | StreamingRecv of H.Request.t * payload_recv_callback
+    | Streaming of (H.Request_header.t
+                    * payload_send_callback
+                    * payload_recv_callback)
 
-type result =
-  | Response of H.Response.t
-  | Response_header of H.Response_header.t
-  | Error of string
+  type t = {
+    conn : C.t;
+    callbacks : callbacks;
+    mutable closed : bool;
 
-let do_parse t s o l =
-  match t.recv_state with
-    | Empty ->
-        (* We got data from the peer when we weren't expecting any.
-           For now, we'll just log it and mark it as consumed.  TODO:
-           handle this better. *)
-        Printf.printf "Unexpected early response: %s\n%!" (String.sub s o l);
-        None, l
-    | Normal st ->
-        (match H.Response.parse_substring st s o l with
-           | H.Response.Parse_incomplete st ->
-               t.recv_state <- Normal st;
-               None, l
-           | H.Response.Result (resp, consumed) ->
-               let token = t.recv_token in
-                 prepare_for_next_response t;
-                 Some (token, Response resp), consumed
-           | H.Response.Error s ->
-               (* We don't really know how much was consumed, but just
-                  lets say we consumed it all, since it's pointless to
-                  continue parsing any further. *)
-               Some (t.recv_token, Error s), l)
-    | Headers st ->
-        (match H.Response_header.parse_substring st s o l with
-           | H.Response_header.Parse_incomplete st ->
-               t.recv_state <- Headers st;
-               None, l
-           | H.Response_header.Result (resphdr, consumed) ->
-               (match (H.Payload.init_from_response
-                         ~payload_callback:(get_payload_callback t)
-                         resphdr) with
-                  | H.Payload.No_payload ->
-                      let token = t.recv_token in
-                        prepare_for_next_response t;
-                        Some (token, Response_header resphdr), consumed
-                  | H.Payload.Payload st ->
-                      t.recv_state <- Payload st;
-                      Some (t.recv_token, Response_header resphdr), consumed
-                  | H.Payload.Error s ->
-                      let token = t.recv_token in
-                        prepare_for_next_response t;
-                        Some (token, Error s), consumed))
-    | Payload st ->
-        (match H.Payload.parse_substring st s o l with
-           | H.Payload.Parse_incomplete st ->
-               t.recv_state <- Payload st;
-               None, l
-           | H.Payload.Result (_, consumed) ->
-               prepare_for_next_response t;
-               None, consumed)
+    (* requests waiting to be sent, in order *)
+    mutable send_queue : (request * callback) Queue.t;
+    mutable send_state : send_state;
 
-let recv_callback conn s o l =
-  let t = Conns.get_conn (C.get_handle conn) in
-  let last_offs = o + l in
-  let rec dispatcher off =
-    let len = last_offs - off in
-      if len > 0 && not t.closed then begin
-        try
-          match do_parse t s off len with
-            | None, consumed ->
-                dispatcher (off + consumed)
-            | Some (token, Response resp), consumed ->
-                t.callbacks.response_callback t token resp;
-                dispatcher (off + consumed)
-            | Some (token, Response_header resphdr), consumed ->
-                t.callbacks.response_header_callback t token resphdr;
-                dispatcher (off + consumed)
-            | Some (token, Error msg), consumed ->
-                t.callbacks.error_callback t (Error_http (token, msg));
-                dispatcher (off + consumed)
-        with
-          | H.Headers.Http_error e ->
-              t.callbacks.error_callback t
-                (Error_http (t.recv_token,
-                             (H.Headers.string_of_error e)))
-          | H.Response_header.Http_error e ->
-              t.callbacks.error_callback t
-                (Error_http (t.recv_token,
-                             (H.Response_header.string_of_error e)))
-          | H.Response.Http_error e ->
-              t.callbacks.error_callback t
-                (Error_http (t.recv_token,
-                             (H.Response.string_of_error e)))
-          | H.Payload.Http_error e ->
-              t.callbacks.error_callback t
-                (Error_http (t.recv_token,
-                             (H.Payload.string_of_error e)))
+    (* requests awaiting responses, in order *)
+    mutable recv_queue : (request * callback) Queue.t;
+    mutable recv_state : recv_state;
+  }
 
+  and callbacks = {
+    response_header_callback : callback -> t -> H.Response_header.t -> unit;
+    response_callback : callback -> t -> H.Response.t -> unit;
+
+    connect_callback : t -> unit;
+    shutdown_callback : t -> unit;
+    error_callback : t -> error -> unit;
+  }
+
+  module Conns = Conn_map.Make(struct type conn = t end)
+
+  let connect_callback conn =
+    let t = Conns.get_conn (C.get_handle conn) in
+      t.callbacks.connect_callback t
+
+  let error_callback conn e =
+    let t = Conns.get_conn (C.get_handle conn) in
+      t.callbacks.error_callback t (Error_eventloop e)
+
+  let send_request t req cb =
+    Queue.add (req, cb) t.send_queue;
+    C.enable_send_done t.conn
+
+  let adjust_recv_state t =
+    if not t.closed then
+      if Queue.is_empty t.recv_queue then begin
+        C.disable_recv t.conn;
+        t.recv_state <- Empty;
+      end else begin
+        C.enable_recv t.conn;
+        let top, cb = Queue.top t.recv_queue in
+          match top with
+            | Small _
+            | StreamingSend _ ->
+                t.recv_state <- Normal (H.Response.init_state (), cb)
+            | StreamingRecv _
+            | Streaming _ ->
+                t.recv_state <- Headers (H.Response_header.init_state (), cb)
       end
-  in dispatcher o
 
-let shutdown_callback conn =
-  let t = Conns.get_conn (C.get_handle conn) in
+  let prepare_for_next_response t =
+    ignore (Queue.pop t.recv_queue);
+    adjust_recv_state t
+
+  let append_to_recv_queue t reqcb =
+    Queue.add reqcb t.recv_queue;
+    if t.recv_state = Empty then adjust_recv_state t
+
+  let send_done_callback conn =
+    let t = Conns.get_conn (C.get_handle conn) in
+      match Queue.is_empty t.send_queue with
+        | true ->
+            assert (t.send_state = Send_start);
+            C.disable_send_done t.conn
+        | false ->
+            let (top, cb) as topcb = Queue.top t.send_queue in
+              match (t.send_state, top) with
+                | Send_start, Small req
+                | Send_start, StreamingRecv (req, _) ->
+                    H.Request.serialize (C.get_send_buf t.conn) req;
+                    C.enable_send_done t.conn;
+                    append_to_recv_queue t (Queue.pop t.send_queue)
+                | Send_start, StreamingSend (reqhdr, _)
+                | Send_start, Streaming (reqhdr, _, _) ->
+                    H.Request_header.serialize (C.get_send_buf t.conn) reqhdr;
+                    C.enable_send_done t.conn;
+                    t.send_state <- Send_payload;
+                    (* We might get a response before we finish
+                       sending the request payload, so put the request
+                       on the recv_queue now. *)
+                    append_to_recv_queue t topcb;
+                | Send_payload, Small _
+                | Send_payload, StreamingRecv _ ->
+                    assert false
+                | Send_payload, StreamingSend (_, scb)
+                | Send_payload, Streaming (_, scb, _) ->
+                    let fin, payload, off, len = scb () in
+                      C.send_substring t.conn payload off len;
+                      if fin then begin
+                        ignore (Queue.pop t.send_queue);
+                        t.send_state <- Send_start;
+                      end
+
+  let get_payload_callback t =
+    match fst (Queue.top t.recv_queue) with
+      | Small _
+      | StreamingSend _ ->
+          assert false
+      | StreamingRecv (_, prcb)
+      | Streaming (_, _, prcb) ->
+          prcb
+
+  type result =
+    | Response of H.Response.t
+    | Response_header of H.Response_header.t
+    | Error of string
+
+  let do_parse t s o l =
     match t.recv_state with
       | Empty ->
-          (* The peer shutdown before we finished sending out any
-             request. *)
-          t.callbacks.shutdown_callback t
-      | Normal st ->
-          H.Response.connection_closed st;
-          (match H.Response.get_parse_result st with
-             | None ->
-                 t.callbacks.shutdown_callback t
-             | Some resp ->
+          (* We got data from the peer when we weren't expecting any.
+             For now, we'll just log it and mark it as consumed.
+             TODO: handle this better. *)
+          Printf.printf "Unexpected early response: %s\n%!" (String.sub s o l);
+          None, l
+      | Normal (st, cb) ->
+          (match H.Response.parse_substring st s o l with
+             | H.Response.Parse_incomplete st ->
+                 t.recv_state <- Normal (st, cb);
+                 None, l
+             | H.Response.Result (resp, consumed) ->
                  prepare_for_next_response t;
-                 t.callbacks.response_callback t t.recv_token resp
-          );
-      | Headers st ->
-          t.callbacks.shutdown_callback t
-      | Payload st ->
-          H.Payload.connection_closed st;
-          t.callbacks.shutdown_callback t
+                 Some (cb, Response resp), consumed
+             | H.Response.Error s ->
+                 (* We don't really know how much was consumed, but
+                    just lets say we consumed it all, since it's
+                    pointless to continue parsing any further. *)
+                 Some (cb, Error s), l)
+      | Headers (st, cb) ->
+          (match H.Response_header.parse_substring st s o l with
+             | H.Response_header.Parse_incomplete st ->
+                 t.recv_state <- Headers (st, cb);
+                 None, l
+             | H.Response_header.Result (resphdr, consumed) ->
+                 (match (H.Payload.init_from_response
+                           ~payload_callback:(get_payload_callback t)
+                           resphdr) with
+                    | H.Payload.No_payload ->
+                        prepare_for_next_response t;
+                        Some (cb, Response_header resphdr), consumed
+                    | H.Payload.Payload st ->
+                        t.recv_state <- Payload (st, cb);
+                        Some (cb, Response_header resphdr), consumed
+                    | H.Payload.Error s ->
+                        prepare_for_next_response t;
+                        Some (cb, Error s), consumed))
+      | Payload (st, cb) ->
+          (match H.Payload.parse_substring st s o l with
+             | H.Payload.Parse_incomplete st ->
+                 t.recv_state <- Payload (st, cb);
+                 None, l
+             | H.Payload.Result (_, consumed) ->
+                 prepare_for_next_response t;
+                 None, consumed)
 
-let connect ev_loop addr callbacks =
-  let sock = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
-  let acallbacks = {
-    C.connect_callback   = connect_callback;
-    C.recv_callback      = recv_callback;
-    C.send_done_callback = send_done_callback;
-    C.shutdown_callback  = shutdown_callback;
-    C.error_callback     = error_callback;
-  } in
-  let aconn = C.attach ev_loop sock acallbacks in
-  let t = {
-    conn       = aconn;
-    callbacks  = callbacks;
-    closed     = false;
+  let recv_callback conn s o l =
+    let t = Conns.get_conn (C.get_handle conn) in
+    let last_offs = o + l in
+    let rec dispatcher off =
+      let len = last_offs - off in
+        if len > 0 && not t.closed then begin
+          try
+            match do_parse t s off len with
+              | None, consumed ->
+                  dispatcher (off + consumed)
+              | Some (cb, Response resp), consumed ->
+                  t.callbacks.response_callback cb t resp;
+                  dispatcher (off + consumed)
+              | Some (cb, Response_header resphdr), consumed ->
+                  t.callbacks.response_header_callback cb t resphdr;
+                  dispatcher (off + consumed)
+              | Some (cb, Error msg), consumed ->
+                  t.callbacks.error_callback t (Error_http (cb, msg));
+                  dispatcher (off + consumed)
+          with
+            | H.Headers.Http_error e ->
+                let cb = snd (Queue.top t.recv_queue) in
+                  t.callbacks.error_callback t
+                    (Error_http (cb, (H.Headers.string_of_error e)))
+            | H.Response_header.Http_error e ->
+                let cb = snd (Queue.top t.recv_queue) in
+                  t.callbacks.error_callback t
+                    (Error_http (cb, (H.Response_header.string_of_error e)))
+            | H.Response.Http_error e ->
+                let cb = snd (Queue.top t.recv_queue) in
+                t.callbacks.error_callback t
+                  (Error_http (cb, (H.Response.string_of_error e)))
+            | H.Payload.Http_error e ->
+                let cb = snd (Queue.top t.recv_queue) in
+                  t.callbacks.error_callback t
+                    (Error_http (cb, (H.Payload.string_of_error e)))
+        end
+    in dispatcher o
 
-    send_queue = Queue.create ();
-    send_token = 0;
-    send_state = Send_start;
+  let shutdown_callback conn =
+    let t = Conns.get_conn (C.get_handle conn) in
+      match t.recv_state with
+        | Empty ->
+            (* The peer shutdown before we finished sending out any
+               request. *)
+            t.callbacks.shutdown_callback t
+        | Normal (st, cb) ->
+            H.Response.connection_closed st;
+            (match H.Response.get_parse_result st with
+               | None ->
+                   t.callbacks.shutdown_callback t
+               | Some resp ->
+                   prepare_for_next_response t;
+                   t.callbacks.response_callback cb t resp
+            );
+        | Headers _ ->
+            t.callbacks.shutdown_callback t
+        | Payload (st, _) ->
+            H.Payload.connection_closed st;
+            t.callbacks.shutdown_callback t
 
-    recv_queue = Queue.create ();
-    recv_state = Empty;
-    recv_token = 0;
-  } in
-    Conns.add_conn (C.get_handle aconn) t;
-    C.connect aconn addr;
-    t
+  let connect ev_loop addr callbacks =
+    let sock = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
+    let acallbacks = {
+      C.connect_callback   = connect_callback;
+      C.recv_callback      = recv_callback;
+      C.send_done_callback = send_done_callback;
+      C.shutdown_callback  = shutdown_callback;
+      C.error_callback     = error_callback;
+    } in
+    let aconn = C.attach ev_loop sock acallbacks in
+    let t = {
+      conn       = aconn;
+      callbacks  = callbacks;
+      closed     = false;
 
-let detach t =
-  Conns.remove_conn (C.get_handle t.conn);
-  C.detach t.conn
+      send_queue = Queue.create ();
+      send_state = Send_start;
 
-let close t =
-  t.closed <- true;
-  (try detach t with _ -> ());
-  C.close t.conn
+      recv_queue = Queue.create ();
+      recv_state = Empty;
+    } in
+      Conns.add_conn (C.get_handle aconn) t;
+      C.connect aconn addr;
+      t
 
-let string_of_error = function
-  | Error_eventloop (e, f, s) ->
-      Printf.sprintf "Eventloop: %s (%s): %s"
-        f s (Unix.error_message e)
-  | Error_http (_, msg) ->
-      Printf.sprintf "Http: %s" msg
+  let detach t =
+    Conns.remove_conn (C.get_handle t.conn);
+    C.detach t.conn
 
+  let close t =
+    t.closed <- true;
+    (try detach t with _ -> ());
+    C.close t.conn
+
+  let string_of_error = function
+    | Error_eventloop (e, f, s) ->
+        Printf.sprintf "Eventloop: %s (%s): %s"
+          f s (Unix.error_message e)
+    | Error_http (_, msg) ->
+        Printf.sprintf "Http: %s" msg
+end
