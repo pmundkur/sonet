@@ -40,4 +40,7 @@ val string_of_error : error -> string
 val of_string : string -> t
 val to_string : t -> string
 
+val abspath_to_string : t -> string
+val authority_to_string : t -> string
+
 val normalize : t -> t

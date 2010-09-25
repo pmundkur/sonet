@@ -248,22 +248,29 @@ let parse_uri s =
 let of_string s = parse_uri s
 
 (* See Section 5.3 of RFC 3986. *)
-let authority_to_string a =
-  let mod_host = match a.userinfo with None -> a.host | Some u -> u ^ "@" ^ a.host
-  in match a.port with None -> mod_host | Some p -> mod_host ^ ":" ^ string_of_int p
+let authority_to_string u =
+  match u.authority with
+    | None -> ""
+    | Some a ->
+        let mod_host =
+          (match a.userinfo with | None -> a.host | Some u -> u ^ "@" ^ a.host)
+        in (match a.port with
+              | None -> mod_host
+              | Some p -> mod_host ^ ":" ^ string_of_int p)
 
-let to_string u =
-  let scheme =
-    match u.scheme with None -> "" | Some s -> s ^ ":" in
-  let append_authority acc =
-    match u.authority with None -> acc | Some a -> acc ^ "//" ^ (authority_to_string a) in
-  let append_path acc =
-    match u.path with None -> acc | Some p -> acc ^ p in
+let abspath_to_string u =
+  let path =
+    match u.path with None | Some "" -> "/" | Some p -> p in
   let append_query acc =
     match u.query with None -> acc | Some q -> acc ^ "?" ^ q in
   let append_fragment acc =
     match u.fragment with None -> acc | Some f -> acc ^ "#" ^ f
-  in append_fragment (append_query (append_path (append_authority scheme)))
+  in append_fragment (append_query path)
+
+let to_string u =
+  let scheme =
+    match u.scheme with None -> "" | Some s -> s ^ ":"
+  in scheme ^ "//" ^ (authority_to_string u) ^ (abspath_to_string u)
 
 (* See Section 6 of RFC 3986.  This function implements case
    normalization, percent-encoding normalization, and path segment
