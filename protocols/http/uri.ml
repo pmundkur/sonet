@@ -150,10 +150,13 @@ let parse_authority s =
   in
   let auth_regexp = Str.regexp auth_re in
     if Str.string_match auth_regexp s 0 then
-      Some { userinfo = get_opt_group 2;
-             host     = Str.matched_group 3 s;
-             port     = get_opt_port ();
-           }
+      let ret = Some { userinfo = get_opt_group 2;
+                       host     = Str.matched_group 3 s;
+                       port     = get_opt_port ();
+                     }
+      in
+        if ret = Some { userinfo = None; host = ""; port = None }
+        then None else ret
     else None
 
 (* The following regular expression and explanation is taken from
