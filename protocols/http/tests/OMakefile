@@ -12,8 +12,12 @@ TEST_PARSER = $(OCamlProgram $(TEST_PARSER_PROG), test_http)
 TEST_CONN_PROG = test_http_conn
 TEST_CONN = $(OCamlProgram $(TEST_CONN_PROG), test_http_conn)
 
-.DEFAULT: $(TEST_PARSER) $(TEST_CONN)
+TEST_URI_PROG = test_uri
+TEST_URI = $(OCamlProgram $(TEST_URI_PROG), test_uri)
+
+
+.DEFAULT: $(TEST_PARSER) $(TEST_CONN) $(TEST_URI)
 
 .PHONY: clean
 clean:
-	$(CLEAN) $(TEST_PARSER) $(TEST_CONN)
+	$(CLEAN) $(TEST_PARSER) $(TEST_CONN) $(TEST_URI)
