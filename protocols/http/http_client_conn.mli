@@ -17,25 +17,27 @@
 
 module type CallbackType = sig type t end
 
+type payload_send_callback =
+    unit -> bool * string * (* offset *) int * (* length *) int
+type payload_recv_callback = Http.payload_callback
+
+type request =
+  | Small of Http.Request.t
+  | StreamingSend of Http.Request_header.t * payload_send_callback
+  | StreamingRecv of Http.Request.t * payload_recv_callback
+  | Streaming of (Http.Request_header.t
+                  * payload_send_callback
+                  * payload_recv_callback)
+
 module type Conn =
 sig
 
   type t
   type callback
 
-  type payload_send_callback =
-      unit -> bool * string * (* offset *) int * (* length *) int
-  type payload_recv_callback = Http.payload_callback
-
-  type request =
-    | Small of Http.Request.t
-    | StreamingSend of Http.Request_header.t * payload_send_callback
-    | StreamingRecv of Http.Request.t * payload_recv_callback
-    | Streaming of (Http.Request_header.t
-		    * payload_send_callback
-		    * payload_recv_callback)
-
-  val send_request : t -> request -> callback -> unit
+  (* if the connection has not yet been established, the request will
+     be queued to be sent once the connection is established *)
+  val send_request : request -> callback -> t -> unit
 
   type error =
     | Error_eventloop of Eventloop.error
@@ -44,12 +46,9 @@ sig
   val string_of_error : error -> string
 
   type callbacks = {
-    (* called only for StreamingRecv and Streaming requests *)
-    response_header_callback : callback -> t -> Http.Response_header.t -> unit;
-    (* called only for Small and StreamingSend requests *)
-    response_callback : callback -> t -> Http.Response.t -> unit;
-
+    (* this will be called if no requests have been queued to be sent *)
     connect_callback : t -> unit;
+    response_callback : callback -> t -> Http.Response.t -> unit;
     shutdown_callback : t -> unit;
     error_callback : t -> error -> unit;
   }

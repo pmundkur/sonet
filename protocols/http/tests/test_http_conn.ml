@@ -18,7 +18,8 @@
 module H = Http
 
 module Callback = struct type t = int end
-module Client = Http_client_conn.Make(Callback)
+module Conn = Http_client_conn
+module Client = Conn.Make(Callback)
 
 let unopt = function
   | None -> assert false
@@ -37,9 +38,6 @@ let addr_of_host h scheme =
     get_suitable (Unix.getaddrinfo h scheme
                     [ Unix.AI_FAMILY Unix.PF_INET;
                       Unix.AI_SOCKTYPE Unix.SOCK_STREAM])
-let log_resphdr u hdr =
-  Printf.printf "%s: %d %s\n%!"
-    u hdr.H.Response_header.status_code hdr.H.Response_header.reason_phrase
 
 let log_resp u resp ~show_payload =
   let hdr = resp.H.Response.response in
@@ -48,9 +46,9 @@ let log_resp u resp ~show_payload =
       | None -> ""
       | Some p -> Buffer.contents p.H.Payload.content
   in
-  Printf.printf "%s: %d %s\n%s\n%!"
-    u hdr.H.Response_header.status_code hdr.H.Response_header.reason_phrase
-    (if show_payload then payload else "")
+    Printf.printf "%s: %d %s\n%s\n%!"
+      u hdr.H.Response_header.status_code hdr.H.Response_header.reason_phrase
+      (if show_payload then payload else "")
 
 let make_small _t url =
   let host = snd (addr_of_url url) in
@@ -59,7 +57,8 @@ let make_small _t url =
                  url = H.Request_header.Uri (Uri.of_string "/");
                  headers = ["host", [host]]
                } in
-    Client.Small { H.Request.request = reqhdr; payload = None }
+    Conn.Small { H.Request.request = reqhdr; payload = None }
+
 let make_stream_recv t url =
   let host = snd (addr_of_url url) in
   let reqhdr = { H.Request_header.version = H.HTTP11;
@@ -70,15 +69,13 @@ let make_stream_recv t url =
   let cb t s o l f =
     Printf.eprintf "%s%!" (String.sub s o l);
     if f then Client.close t
-  in Client.StreamingRecv ({ H.Request.request = reqhdr; payload = None },
-                           cb t)
+  in Conn.StreamingRecv ({ H.Request.request = reqhdr; payload = None },
+                         cb t)
 
 let get_url el u p =
   let cbs = {
     Client.connect_callback =
       (fun _ -> ());
-    Client.response_header_callback =
-      (fun _ _ rhdr -> log_resphdr u rhdr);
     Client.response_callback =
       (fun _ t resp ->
          log_resp u resp ~show_payload:false;
@@ -97,8 +94,8 @@ let get_url el u p =
           let t = Client.connect el (Unix.ADDR_INET (a, p)) cbs in
           let req = make_small t u in
           let sreq = make_stream_recv t u in
-            ignore (Client.send_request t req 0);
-            ignore (Client.send_request t sreq 1)
+            ignore (Client.send_request req 0 t);
+            ignore (Client.send_request sreq 1 t)
 
 let run () =
   let el = Eventloop.create () in

@@ -23,12 +23,6 @@ module H = Http
 
 module type CallbackType = sig type t end
 
-module type Conn =
-sig
-
-  type t
-  type callback
-
   type payload_send_callback = unit -> bool * string * int * int
   type payload_recv_callback = H.payload_callback
 
@@ -40,7 +34,13 @@ sig
                     * payload_send_callback
                     * payload_recv_callback)
 
-  val send_request : t -> request -> callback -> unit
+module type Conn =
+sig
+
+  type t
+  type callback
+
+  val send_request : request -> callback -> t -> unit
 
   type error =
     | Error_eventloop of Eventloop.error
@@ -49,12 +49,8 @@ sig
   val string_of_error : error -> string
 
   type callbacks = {
-    (* called only for StreamingRecv and Streaming requests *)
-    response_header_callback : callback -> t -> Http.Response_header.t -> unit;
-    (* called only for Small and StreamingSend requests *)
-    response_callback : callback -> t -> Http.Response.t -> unit;
-
     connect_callback : t -> unit;
+    response_callback : callback -> t -> Http.Response.t -> unit;
     shutdown_callback : t -> unit;
     error_callback :  t -> error -> unit;
   }
@@ -79,21 +75,8 @@ module Make (Callback : CallbackType) = struct
     | Send_payload
 
   type recv_state =
-    | Empty
-    | Normal of H.Response.state * callback
-    | Headers of H.Response_header.state * callback
-    | Payload of H.Payload.state * callback
-
-  type payload_send_callback = unit -> bool * string * int * int
-  type payload_recv_callback = H.payload_callback
-
-  type request =
-    | Small of H.Request.t
-    | StreamingSend of H.Request_header.t * payload_send_callback
-    | StreamingRecv of H.Request.t * payload_recv_callback
-    | Streaming of (H.Request_header.t
-                    * payload_send_callback
-                    * payload_recv_callback)
+    | Recv_idle
+    | Recv_incoming of H.Response.state * callback
 
   type t = {
     conn : C.t;
@@ -110,10 +93,8 @@ module Make (Callback : CallbackType) = struct
   }
 
   and callbacks = {
-    response_header_callback : callback -> t -> H.Response_header.t -> unit;
-    response_callback : callback -> t -> H.Response.t -> unit;
-
     connect_callback : t -> unit;
+    response_callback : callback -> t -> H.Response.t -> unit;
     shutdown_callback : t -> unit;
     error_callback : t -> error -> unit;
   }
@@ -122,13 +103,16 @@ module Make (Callback : CallbackType) = struct
 
   let connect_callback conn =
     let t = Conns.get_conn (C.get_handle conn) in
-      t.callbacks.connect_callback t
+      if Queue.is_empty t.send_queue then
+        t.callbacks.connect_callback t
+      else
+        C.enable_send_done t.conn
 
   let error_callback conn e =
     let t = Conns.get_conn (C.get_handle conn) in
       t.callbacks.error_callback t (Error_eventloop e)
 
-  let send_request t req cb =
+  let send_request req cb t =
     Queue.add (req, cb) t.send_queue;
     C.enable_send_done t.conn
 
@@ -136,17 +120,19 @@ module Make (Callback : CallbackType) = struct
     if not t.closed then
       if Queue.is_empty t.recv_queue then begin
         C.disable_recv t.conn;
-        t.recv_state <- Empty;
+        t.recv_state <- Recv_idle;
       end else begin
         C.enable_recv t.conn;
         let top, cb = Queue.top t.recv_queue in
           match top with
             | Small _
             | StreamingSend _ ->
-                t.recv_state <- Normal (H.Response.init_state (), cb)
-            | StreamingRecv _
-            | Streaming _ ->
-                t.recv_state <- Headers (H.Response_header.init_state (), cb)
+                let st = H.Response.init_state () in
+                  t.recv_state <- Recv_incoming (st, cb)
+            | StreamingRecv (_, prcb)
+            | Streaming (_, _, prcb) ->
+                let st = H.Response.init_state ~payload_callback:prcb () in
+                  t.recv_state <- Recv_incoming (st, cb)
       end
 
   let prepare_for_next_response t =
@@ -155,7 +141,7 @@ module Make (Callback : CallbackType) = struct
 
   let append_to_recv_queue t reqcb =
     Queue.add reqcb t.recv_queue;
-    if t.recv_state = Empty then adjust_recv_state t
+    if t.recv_state = Recv_idle then adjust_recv_state t
 
   let send_done_callback conn =
     let t = Conns.get_conn (C.get_handle conn) in
@@ -192,7 +178,7 @@ module Make (Callback : CallbackType) = struct
                         t.send_state <- Send_start;
                       end
 
-  let get_payload_callback t =
+  let get_payload_recv_callback t =
     match fst (Queue.top t.recv_queue) with
       | Small _
       | StreamingSend _ ->
@@ -203,21 +189,20 @@ module Make (Callback : CallbackType) = struct
 
   type result =
     | Response of H.Response.t
-    | Response_header of H.Response_header.t
     | Error of string
 
   let do_parse t s o l =
     match t.recv_state with
-      | Empty ->
+      | Recv_idle ->
           (* We got data from the peer when we weren't expecting any.
              For now, we'll just log it and mark it as consumed.
              TODO: handle this better. *)
           Printf.printf "Unexpected early response: %s\n%!" (String.sub s o l);
           None, l
-      | Normal (st, cb) ->
+      | Recv_incoming (st, cb) ->
           (match H.Response.parse_substring st s o l with
              | H.Response.Parse_incomplete st ->
-                 t.recv_state <- Normal (st, cb);
+                 t.recv_state <- Recv_incoming (st, cb);
                  None, l
              | H.Response.Result (resp, consumed) ->
                  prepare_for_next_response t;
@@ -227,32 +212,6 @@ module Make (Callback : CallbackType) = struct
                     just lets say we consumed it all, since it's
                     pointless to continue parsing any further. *)
                  Some (cb, Error s), l)
-      | Headers (st, cb) ->
-          (match H.Response_header.parse_substring st s o l with
-             | H.Response_header.Parse_incomplete st ->
-                 t.recv_state <- Headers (st, cb);
-                 None, l
-             | H.Response_header.Result (resphdr, consumed) ->
-                 (match (H.Payload.init_from_response
-                           ~payload_callback:(get_payload_callback t)
-                           resphdr) with
-                    | H.Payload.No_payload ->
-                        prepare_for_next_response t;
-                        Some (cb, Response_header resphdr), consumed
-                    | H.Payload.Payload st ->
-                        t.recv_state <- Payload (st, cb);
-                        Some (cb, Response_header resphdr), consumed
-                    | H.Payload.Error s ->
-                        prepare_for_next_response t;
-                        Some (cb, Error s), consumed))
-      | Payload (st, cb) ->
-          (match H.Payload.parse_substring st s o l with
-             | H.Payload.Parse_incomplete st ->
-                 t.recv_state <- Payload (st, cb);
-                 None, l
-             | H.Payload.Result (_, consumed) ->
-                 prepare_for_next_response t;
-                 None, consumed)
 
   let recv_callback conn s o l =
     let t = Conns.get_conn (C.get_handle conn) in
@@ -266,9 +225,6 @@ module Make (Callback : CallbackType) = struct
                   dispatcher (off + consumed)
               | Some (cb, Response resp), consumed ->
                   t.callbacks.response_callback cb t resp;
-                  dispatcher (off + consumed)
-              | Some (cb, Response_header resphdr), consumed ->
-                  t.callbacks.response_header_callback cb t resphdr;
                   dispatcher (off + consumed)
               | Some (cb, Error msg), consumed ->
                   t.callbacks.error_callback t (Error_http (cb, msg));
@@ -284,8 +240,8 @@ module Make (Callback : CallbackType) = struct
                     (Error_http (cb, (H.Response_header.string_of_error e)))
             | H.Response.Http_error e ->
                 let cb = snd (Queue.top t.recv_queue) in
-                t.callbacks.error_callback t
-                  (Error_http (cb, (H.Response.string_of_error e)))
+                  t.callbacks.error_callback t
+                    (Error_http (cb, (H.Response.string_of_error e)))
             | H.Payload.Http_error e ->
                 let cb = snd (Queue.top t.recv_queue) in
                   t.callbacks.error_callback t
@@ -296,11 +252,11 @@ module Make (Callback : CallbackType) = struct
   let shutdown_callback conn =
     let t = Conns.get_conn (C.get_handle conn) in
       match t.recv_state with
-        | Empty ->
+        | Recv_idle ->
             (* The peer shutdown before we finished sending out any
                request. *)
             t.callbacks.shutdown_callback t
-        | Normal (st, cb) ->
+        | Recv_incoming (st, cb) ->
             H.Response.connection_closed st;
             (match H.Response.get_parse_result st with
                | None ->
@@ -308,12 +264,7 @@ module Make (Callback : CallbackType) = struct
                | Some resp ->
                    prepare_for_next_response t;
                    t.callbacks.response_callback cb t resp
-            );
-        | Headers _ ->
-            t.callbacks.shutdown_callback t
-        | Payload (st, _) ->
-            H.Payload.connection_closed st;
-            t.callbacks.shutdown_callback t
+            )
 
   let connect ev_loop addr callbacks =
     let sock = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
@@ -334,7 +285,7 @@ module Make (Callback : CallbackType) = struct
       send_state = Send_start;
 
       recv_queue = Queue.create ();
-      recv_state = Empty;
+      recv_state = Recv_idle;
     } in
       Conns.add_conn (C.get_handle aconn) t;
       C.connect aconn addr;
