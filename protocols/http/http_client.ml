@@ -199,8 +199,7 @@ let start_requests el requests =
     | [] -> ()
     | (meth, req) :: rest ->
         (match make_conn el results meth req with
-           | None ->
-               Printf.printf "Started connection for %s...\n%!" (get_url req)
+           | None -> ()
            | Some errmsg ->
                let res = { meth = meth;
                            url = (get_url req);
