@@ -28,6 +28,10 @@ type error =
   | Unix of Unix.error
   | Other of string
 
+exception Invalid_url of url * string
+
+val is_supported_url : url -> bool
+
 type result = {
   meth : Http.Request_header.meth;
   url : string;

@@ -31,6 +31,8 @@ type error =
   | Unix of Unix.error
   | Other of string
 
+exception Invalid_url of url * string
+
 type result = {
   meth : H.Request_header.meth;
   url : string;
@@ -50,9 +52,10 @@ type state = callback array
 
 module Conn = Http_client_conn.Make(struct type t = callback end)
 
-let unopt = function
-  | None -> assert false
-  | Some v -> v
+let unopt opt e =
+  match opt with
+    | None -> raise e
+    | Some v -> v
 
 let defopt def = function
   | None -> def
@@ -105,9 +108,13 @@ let error_callback cb t e =
 
 let scheme_host_port url =
   let uri = Uri.of_string url in
-  let auth = unopt uri.Uri.authority in
-  let scheme = unopt uri.Uri.scheme in
+  let auth = unopt uri.Uri.authority (Invalid_url (url, "no host")) in
+  let scheme = unopt uri.Uri.scheme (Invalid_url (url, "no scheme")) in
     scheme, auth.Uri.host, auth.Uri.port
+
+let is_supported_url url =
+  try ignore (scheme_host_port url); true
+  with Invalid_url _ -> false
 
 let addr_of_host h scheme =
   let rec get_suitable = function
