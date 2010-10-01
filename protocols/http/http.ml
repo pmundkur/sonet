@@ -442,8 +442,7 @@ module Request_header = struct
       | Done -> Some { version = optval state.s_version;
                        meth = optval state.s_meth;
                        url = optval state.s_url;
-                       headers = state.s_headers
-                     }
+                       headers = state.s_headers }
       | _ -> None
 
   let parse_substring state str ofs len =
@@ -689,9 +688,12 @@ module Response_header = struct
             )
         | Version_SP ->
             (match c with
-               | ' ' | '\t' -> ()
-               | _ when Httputils.is_digit c -> s.cursor <- In_status_code ((Httputils.digit_value c), 1)
-               | _ -> raise_bad_char s c
+               | ' ' | '\t' ->
+                   ()
+               | _ when Httputils.is_digit c ->
+                   s.cursor <- In_status_code ((Httputils.digit_value c), 1)
+               | _ ->
+                   raise_bad_char s c
             )
         | In_status_code (sc, nd) ->
             (match c with
@@ -760,8 +762,7 @@ module Response_header = struct
       | Done -> Some { version = optval state.s_version;
                        status_code = optval state.s_status_code;
                        reason_phrase = optval state.s_reason_phrase;
-                       headers = state.s_headers
-                     }
+                       headers = state.s_headers }
       | _    -> None
 
   let parse_substring state str ofs len =
@@ -926,15 +927,13 @@ module Payload = struct
         *)
         | _, _, _, true, false          -> Payload { default with
                                                        cursor = Start_chunk_length;
-                                                       content_length = Chunked
-                                                   }
+                                                       content_length = Chunked }
         | _, _, `HTTP09, _, false
         | HTTP11, _, `None, _, false    -> No_payload
         | _, _, `Some 0L, _, false      -> No_payload
         | _, _, `Some l, _, false       -> Payload { default with
                                                        content_length = Length l;
-                                                       remaining_length = l
-                                                   }
+                                                       remaining_length = l }
         | _, _, `Error, _, false        -> Error "Invalid Content-Length"
         | _, _, _, _, true              -> Error "multipart/byteranges is unsupported"
 
@@ -960,15 +959,13 @@ module Payload = struct
         *)
         | _, _, true, _     -> Payload { default with
                                            cursor = Start_chunk_length;
-                                           content_length = Chunked
-                                       }
+                                           content_length = Chunked }
 
         | _, `HTTP09, _, _  -> Payload default (* Connection: close *)
         | _, `Some 0L, _, _ -> No_payload
         | _, `Some l, _, _  -> Payload { default with
                                            content_length = Length l;
-                                           remaining_length = l
-                                       }
+                                           remaining_length = l }
         | _, `Error, _, _   -> Error "Invalid Content-Length"
 
         | _, _, _, true     -> Error "multipart/byteranges is currently unsupported"
@@ -1072,8 +1069,7 @@ module Payload = struct
   let get_parse_result state =
     match state.cursor with
       | Done -> Some { content = state.body;
-                       trailers = state.headers
-                     }
+                       trailers = state.headers }
       | _    -> None
 
   let can_optimize state =
@@ -1228,7 +1224,8 @@ module Request = struct
                       | Payload.Payload ps ->
                           state.cursor <- In_payload ps;
                           (* recurse on remaining input *)
-                          parse_helper state str (ofs + consumed) (len - consumed) (pre_consumed + consumed)
+                          parse_helper state str (ofs + consumed) (len - consumed)
+                            (pre_consumed + consumed)
                    )
              | Request_header.Parse_incomplete rs ->
                  state.cursor <- In_request_header rs;
@@ -1237,9 +1234,11 @@ module Request = struct
       | In_payload ps ->
           (match Payload.parse_substring ps str ofs len with
              | Payload.Result (p, consumed) ->
-                 state.num_bytes_parsed <- Int64.add state.num_bytes_parsed (Payload.num_bytes_parsed ps);
+                 state.num_bytes_parsed <-
+                   Int64.add state.num_bytes_parsed (Payload.num_bytes_parsed ps);
                  state.cursor <- Done;
-                 Result ({ request = optval state.s_request; payload = Some p }, pre_consumed + consumed)
+                 Result ({ request = optval state.s_request; payload = Some p },
+                         pre_consumed + consumed)
              | Payload.Parse_incomplete ps ->
                  state.cursor <- In_payload ps;
                  Parse_incomplete state
@@ -1346,7 +1345,8 @@ module Response = struct
                       | Payload.Payload ps ->
                           state.cursor <- In_payload ps;
                           (* recurse on remaining input *)
-                          parse_helper state str (ofs + consumed) (len - consumed) (pre_consumed + consumed)
+                          parse_helper state str (ofs + consumed) (len - consumed)
+                            (pre_consumed + consumed)
                    )
              | Response_header.Parse_incomplete rs ->
                  state.cursor <- In_response_header rs;
@@ -1355,9 +1355,11 @@ module Response = struct
       | In_payload ps ->
           (match Payload.parse_substring ps str ofs len with
              | Payload.Result (p, consumed) ->
-                 state.num_bytes_parsed <- Int64.add state.num_bytes_parsed (Payload.num_bytes_parsed ps);
+                 state.num_bytes_parsed <-
+                   Int64.add state.num_bytes_parsed (Payload.num_bytes_parsed ps);
                  state.cursor <- Done;
-                 Result ({ response = optval state.s_response; payload = Some p }, pre_consumed + consumed)
+                 Result ({ response = optval state.s_response; payload = Some p },
+                         pre_consumed + consumed)
              | Payload.Parse_incomplete ps ->
                  state.cursor <- In_payload ps;
                  Parse_incomplete state

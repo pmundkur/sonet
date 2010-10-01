@@ -36,8 +36,10 @@ type error =
   | Insufficient_space of T.t
 
 let error_message = function
-  | Signature_too_long   -> "Signature too long"
-  | Insufficient_space t -> Printf.sprintf "Insufficient space for %s" (T.to_string t)
+  | Signature_too_long ->
+      "Signature too long"
+  | Insufficient_space t ->
+      Printf.sprintf "Insufficient space for %s" (T.to_string t)
 
 exception Marshal_error of error
 let raise_error e =
@@ -82,11 +84,14 @@ let rec compute_marshaled_size ~offset t v =
           let end_offset = offset + padding in
           let end_offset = (end_offset +
                               (compute_marshaled_size ~offset:end_offset
-                                 (T.T_base T.B_signature) (V.V_signature [ t ]))) in
-          let end_offset = end_offset + compute_marshaled_size ~offset:end_offset t v
+                                 (T.T_base T.B_signature)
+                                 (V.V_signature [ t ]))) in
+          let end_offset = (end_offset + compute_marshaled_size
+                              ~offset:end_offset t v)
           in end_offset - offset
       | _ ->
-          (* We should never reach here after the type_check in the first line. *)
+          (* We should never reach here after the type_check in the
+             first line. *)
           assert false
   in
     dbg " [compute_marshaled_size: ofs=%d size=%d type=%s val=%s"
@@ -129,7 +134,9 @@ let advance ctxt nbytes =
   }
 
 let check_and_align_context ctxt ~align ~size dtype =
-  let padding = T.get_padding ~offset:(ctxt.current_offset - ctxt.start_offset) ~align in
+  let padding = (T.get_padding
+                   ~offset:(ctxt.current_offset - ctxt.start_offset)
+                   ~align) in
     if ctxt.length < padding + size then
       raise_error (Insufficient_space dtype);
     advance ctxt padding
@@ -184,26 +191,26 @@ let put_u32 ?(dtype=T.T_base T.B_uint32) ctxt (b0, b1, b2, b3) =
     ctxt.buffer.[ctxt.current_offset + 3] <- b3;
     advance ctxt 4
 
+let byte_at_32 i ofs =
+  Int32.to_int (Int32.logand (Int32.shift_right_logical i ofs) 0xffl)
+
+let byte_at_64 i ofs =
+  Int64.to_int (Int64.logand (Int64.shift_right_logical i ofs) 0xffL)
+
 let from_int32 endian i =
   let b0 = Char.chr (Int32.to_int (Int32.logand i 0xffl)) in
-  let b1 = Char.chr (Int32.to_int
-                       (Int32.logand (Int32.shift_right_logical i  8) 0xffl)) in
-  let b2 = Char.chr (Int32.to_int
-                       (Int32.logand (Int32.shift_right_logical i 16) 0xffl)) in
-  let b3 = Char.chr (Int32.to_int
-                       (Int32.logand (Int32.shift_right_logical i 24) 0xffl)) in
+  let b1 = Char.chr (byte_at_32 i 8) in
+  let b2 = Char.chr (byte_at_32 i 16) in
+  let b3 = Char.chr (byte_at_32 i 24) in
     match endian with
       | T.Little_endian -> b0, b1, b2, b3
       | T.Big_endian -> b3, b2, b1, b0
 
 let from_uint32 endian i =
   let b0 = Char.chr (Int64.to_int (Int64.logand i 0xffL)) in
-  let b1 = Char.chr (Int64.to_int
-                       (Int64.logand (Int64.shift_right_logical i  8) 0xffL)) in
-  let b2 = Char.chr (Int64.to_int
-                       (Int64.logand (Int64.shift_right_logical i 16) 0xffL)) in
-  let b3 = Char.chr (Int64.to_int
-                       (Int64.logand (Int64.shift_right_logical i 24) 0xffL)) in
+  let b1 = Char.chr (byte_at_64 i 8) in
+  let b2 = Char.chr (byte_at_64 i 16) in
+  let b3 = Char.chr (byte_at_64 i 24) in
     match endian with
       | T.Little_endian -> b0, b1, b2, b3
       | T.Big_endian -> b3, b2, b1, b0
@@ -236,20 +243,13 @@ let put_u64 ?(dtype=T.T_base T.B_uint64) ctxt (b0, b1, b2, b3, b4, b5, b6, b7) =
 
 let from_int64 endian i =
   let b0 = Char.chr (Int64.to_int (Int64.logand i 0xffL)) in
-  let b1 = Char.chr (Int64.to_int
-                       (Int64.logand (Int64.shift_right_logical i  8) 0xffL)) in
-  let b2 = Char.chr (Int64.to_int
-                       (Int64.logand (Int64.shift_right_logical i 16) 0xffL)) in
-  let b3 = Char.chr (Int64.to_int
-                       (Int64.logand (Int64.shift_right_logical i 24) 0xffL)) in
-  let b4 = Char.chr (Int64.to_int
-                       (Int64.logand (Int64.shift_right_logical i 32) 0xffL)) in
-  let b5 = Char.chr (Int64.to_int
-                       (Int64.logand (Int64.shift_right_logical i 40) 0xffL)) in
-  let b6 = Char.chr (Int64.to_int
-                       (Int64.logand (Int64.shift_right_logical i 48) 0xffL)) in
-  let b7 = Char.chr (Int64.to_int
-                       (Int64.logand (Int64.shift_right_logical i 56) 0xffL)) in
+  let b1 = Char.chr (byte_at_64 i 8) in
+  let b2 = Char.chr (byte_at_64 i 16) in
+  let b3 = Char.chr (byte_at_64 i 24) in
+  let b4 = Char.chr (byte_at_64 i 32) in
+  let b5 = Char.chr (byte_at_64 i 40) in
+  let b6 = Char.chr (byte_at_64 i 48) in
+  let b7 = Char.chr (byte_at_64 i 56) in
     match endian with
       | T.Little_endian -> b0, b1, b2, b3, b4, b5, b6, b7
       | T.Big_endian -> b7, b6, b5, b4, b3, b2, b1, b0
@@ -367,12 +367,14 @@ let rec marshal_complete_type ctxt t v =
                              offset + compute_marshaled_size ~offset te ve
                           ) data_start_offset va in
         let array_size = end_offset - data_start_offset in
-        let ctxt = put_u32 ~dtype:t ctxt (from_int32 ctxt.endian (Int32.of_int array_size)) in
+        let ctxt = put_u32 ~dtype:t ctxt (from_int32 ctxt.endian
+                                            (Int32.of_int array_size)) in
           Array.fold_left (fun ctxt v ->
                              marshal_complete_type ctxt te v
                           ) ctxt va
     | T.T_struct tl, V.V_struct vl ->
-        let ctxt = check_and_align_context ctxt ~align:(T.alignment_of t) ~size:0 t in
+        let ctxt = (check_and_align_context ctxt
+                      ~align:(T.alignment_of t) ~size:0 t) in
           List.fold_left2 (fun ctxt t v ->
                              marshal_complete_type ctxt t v
                           ) ctxt tl vl
@@ -380,7 +382,8 @@ let rec marshal_complete_type ctxt t v =
         let ctxt = marshal_signature ctxt (V.V_signature [ t ]) in
           marshal_complete_type ctxt t v
     | _ ->
-        (* We should never reach here after the type_check in the first line. *)
+        (* We should never reach here after the type_check in the
+           first line. *)
         assert false
   in
     dbg " [marshal_complete_type: ofs=%d size=%d type=%s value=%s"

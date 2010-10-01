@@ -196,16 +196,17 @@ let make_conn el results meth req =
 let start_requests el requests =
   let results = ref [] in
   let rec starter = function
-    | [] -> ()
+    | [] ->
+        ()
     | (meth, req) :: rest ->
         (match make_conn el results meth req with
-           | None -> ()
+           | None ->
+               ()
            | Some errmsg ->
                let res = { meth = meth;
                            url = (get_url req);
                            response = None;
-                           error = Some (Other errmsg);
-                         }
+                           error = Some (Other errmsg) }
                in results :=  res :: !results);
         starter rest
   in

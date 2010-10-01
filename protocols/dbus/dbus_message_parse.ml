@@ -285,8 +285,9 @@ let process_fixed_header fh =
        need it to parse the array once we get the array data. *)
   let bytes_remaining, _ = P.take_uint32 tctxt in
   let bytes_remaining = Int64.to_int bytes_remaining in
-    bytes_remaining, (init_context tctxt msg_type (Int64.to_int payload_length) flags
-                        protocol_version serial bytes_remaining)
+    (bytes_remaining,
+     (init_context tctxt msg_type (Int64.to_int payload_length) flags
+        protocol_version serial bytes_remaining))
 
 let unpack_headers hdr_array =
   (* hdr_array is an array of byte-indexed dict_entries (structs); we
@@ -308,7 +309,8 @@ let unpack_headers hdr_array =
                   let ht, hv = List.assoc hdr_code assoc in
                     if ht <> hdr_type
                       (* ht is an unexpected type for standard header *)
-                    then raise_error (Unexpected_header_type (hdr, ht, hdr_type))
+                    then raise_error (Unexpected_header_type
+                                        (hdr, ht, hdr_type))
                     else [ hdr, (hdr_type, hv) ]
                 with Not_found -> []
              ) Protocol.all_headers
@@ -316,7 +318,8 @@ let unpack_headers hdr_array =
 
 let process_headers ctxt =
   let tctxt = (P.append_bytes ctxt.type_context
-                 (Buffer.contents ctxt.buffer) ~offset:0 ~length:(Buffer.length ctxt.buffer)) in
+                 (Buffer.contents ctxt.buffer)
+                 ~offset:0 ~length:(Buffer.length ctxt.buffer)) in
     (* At this point, the parsing context is where process_fixed_header
        left it, i.e. ready to parse the array. *)
   let hdr_array, tctxt = P.parse_complete_type Protocol.hdr_array_type tctxt in
@@ -397,21 +400,22 @@ let rec parse_substring state str ofs len =
             ofs len bytes_remaining bytes_to_consume;
           dbg_input str ofs len;
         let bytes_remaining = bytes_remaining - bytes_to_consume in
-        let tctxt = P.append_bytes ctxt.type_context str ~offset:ofs ~length:bytes_to_consume in
+        let tctxt = (P.append_bytes ctxt.type_context str
+                       ~offset:ofs ~length:bytes_to_consume) in
         let tctxt = P.advance tctxt bytes_to_consume in
           ctxt.type_context <- tctxt;
           if bytes_remaining > 0
           then Parse_incomplete (In_padding (bytes_remaining, ctxt))
-          else
-            parse_substring (In_payload (ctxt.payload_length, ctxt))
-              str (ofs + bytes_to_consume) (len - bytes_to_consume)
+          else (parse_substring (In_payload (ctxt.payload_length, ctxt))
+                  str (ofs + bytes_to_consume) (len - bytes_to_consume))
     | In_payload (bytes_remaining, ctxt) ->
         let bytes_to_consume = min len bytes_remaining in
           dbg "[dbus_message_parse] parse_substring ofs=%d len=%d In-payload(bytes-remaining=%d) consuming %d"
             ofs len bytes_remaining bytes_to_consume;
           dbg_input str ofs len;
         let bytes_remaining = bytes_remaining - bytes_to_consume in
-        let tctxt = P.append_bytes ctxt.type_context str ~offset:ofs ~length:bytes_to_consume in
+        let tctxt = (P.append_bytes ctxt.type_context str
+                       ~offset:ofs ~length:bytes_to_consume) in
           ctxt.type_context <- tctxt;
           if bytes_remaining > 0
           then Parse_incomplete (In_payload (bytes_remaining, ctxt))

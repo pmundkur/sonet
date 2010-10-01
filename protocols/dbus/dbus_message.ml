@@ -17,6 +17,7 @@
 
 module T = Dbus_type
 module V = Dbus_value
+module F = Format
 
 type flag =
   | Msg_flag_no_reply_expected
@@ -158,30 +159,37 @@ let get_headers m =
   let add_destination hdrs =
     match get_destination m with
       | None   -> hdrs
-      | Some d -> (Hdr_destination, (T.T_base T.B_string, V.V_string d)) :: hdrs in
+      | Some d -> ((Hdr_destination, (T.T_base T.B_string, V.V_string d))
+                   :: hdrs) in
   let add_sender hdrs =
     match get_sender m with
       | None   -> hdrs
-      | Some s -> (Hdr_sender, (T.T_base T.B_string, V.V_string s)) :: hdrs in
+      | Some s ->
+          (Hdr_sender, (T.T_base T.B_string, V.V_string s)) :: hdrs in
   let add_signature hdrs =
     match get_signature m with
       | [] -> hdrs
-      | tl -> (Hdr_signature, (T.T_base T.B_signature, V.V_signature tl)) :: hdrs in
+      | tl -> ((Hdr_signature, (T.T_base T.B_signature, V.V_signature tl))
+               :: hdrs) in
   let required_headers =
     match m with
       | Msg_method_call mc -> [
-          Hdr_path, (T.T_base T.B_object_path, V.V_object_path mc.method_call_path);
+          Hdr_path, (T.T_base T.B_object_path,
+                     V.V_object_path mc.method_call_path);
           Hdr_member, (T.T_base T.B_string, V.V_string mc.method_call_member);
         ] @ (match mc.method_call_interface with
                | None   -> []
-               | Some i -> [ Hdr_interface, (T.T_base T.B_string, V.V_string i) ]
+               | Some i -> [ Hdr_interface,
+                             (T.T_base T.B_string, V.V_string i) ]
             )
       | Msg_method_return mr -> [
-          Hdr_reply_serial, (T.T_base T.B_uint32, V.V_uint32 mr.method_return_reply_serial);
+          (Hdr_reply_serial,
+           (T.T_base T.B_uint32, V.V_uint32 mr.method_return_reply_serial));
         ]
       | Msg_error e -> [
           Hdr_error_name, (T.T_base T.B_string, V.V_string e.error_name);
-          Hdr_reply_serial, (T.T_base T.B_uint32, V.V_uint32 e.error_reply_serial);
+          (Hdr_reply_serial,
+           (T.T_base T.B_uint32, V.V_uint32 e.error_reply_serial));
         ]
       | Msg_signal s -> [
           Hdr_path, (T.T_base T.B_object_path, V.V_object_path s.signal_path);
@@ -261,53 +269,55 @@ let pr_string_opt opt_s =
     | Some s -> s
 
 let pr_method_call ff mc =
-  Format.fprintf ff "@[<v 4>  <Method_call@,";
-  Format.fprintf ff "serial       = %Ld@," mc.method_call_serial;
-  Format.fprintf ff "path         = %s@,"  mc.method_call_path;
-  Format.fprintf ff "member       = %s@,"  mc.method_call_member;
-  Format.fprintf ff "interface    = %s@,"  (pr_string_opt mc.method_call_interface);
-  Format.fprintf ff "destination  = %s@,"  (pr_string_opt mc.method_call_destination);
-  Format.fprintf ff "sender       = %s@,"  (pr_string_opt mc.method_call_sender);
-  Format.fprintf ff "signature    = %s@,"  (T.signature_of_types mc.method_call_signature);
-  Format.fprintf ff "@[<v 2>payload =@,";
-  List.iter (fun v -> V.pr_value ff v; Format.fprintf ff "@,") mc.method_call_payload;
-  Format.fprintf ff "@]@,>@]@,"
+  F.fprintf ff "@[<v 4>  <Method_call@,";
+  F.fprintf ff "serial       = %Ld@," mc.method_call_serial;
+  F.fprintf ff "path         = %s@,"  mc.method_call_path;
+  F.fprintf ff "member       = %s@,"  mc.method_call_member;
+  F.fprintf ff "interface    = %s@,"  (pr_string_opt mc.method_call_interface);
+  F.fprintf ff "destination  = %s@,"  (pr_string_opt mc.method_call_destination);
+  F.fprintf ff "sender       = %s@,"  (pr_string_opt mc.method_call_sender);
+  F.fprintf ff "signature    = %s@,"  (T.signature_of_types mc.method_call_signature);
+  F.fprintf ff "@[<v 2>payload =@,";
+  List.iter (fun v -> V.pr_value ff v; F.fprintf ff "@,"
+            ) mc.method_call_payload;
+  F.fprintf ff "@]@,>@]@,"
 
 let pr_method_return ff mr =
-  Format.fprintf ff "@[<v 4>  <Method_return@,";
-  Format.fprintf ff "serial       = %Ld@," mr.method_return_serial;
-  Format.fprintf ff "reply_serial = %Ld@," mr.method_return_reply_serial;
-  Format.fprintf ff "destination  = %s@,"  (pr_string_opt mr.method_return_destination);
-  Format.fprintf ff "sender       = %s@,"  (pr_string_opt mr.method_return_sender);
-  Format.fprintf ff "signature    = %s@,"  (T.signature_of_types mr.method_return_signature);
-  Format.fprintf ff "@[<v 2>payload =@,";
-  List.iter (fun v -> V.pr_value ff v; Format.fprintf ff "@,") mr.method_return_payload;
-  Format.fprintf ff "@]@,>@]@,"
+  F.fprintf ff "@[<v 4>  <Method_return@,";
+  F.fprintf ff "serial       = %Ld@," mr.method_return_serial;
+  F.fprintf ff "reply_serial = %Ld@," mr.method_return_reply_serial;
+  F.fprintf ff "destination  = %s@,"  (pr_string_opt mr.method_return_destination);
+  F.fprintf ff "sender       = %s@,"  (pr_string_opt mr.method_return_sender);
+  F.fprintf ff "signature    = %s@,"  (T.signature_of_types mr.method_return_signature);
+  F.fprintf ff "@[<v 2>payload =@,";
+  List.iter (fun v -> V.pr_value ff v; F.fprintf ff "@,"
+            ) mr.method_return_payload;
+  F.fprintf ff "@]@,>@]@,"
 
 let pr_error ff er =
-  Format.fprintf ff "@[<v 4>  <Error@,";
-  Format.fprintf ff "serial       = %Ld@," er.error_serial;
-  Format.fprintf ff "name         = %s@,"  er.error_name;
-  Format.fprintf ff "reply_serial = %Ld@," er.error_reply_serial;
-  Format.fprintf ff "destination  = %s@,"  (pr_string_opt er.error_destination);
-  Format.fprintf ff "sender       = %s@,"  (pr_string_opt er.error_sender);
-  Format.fprintf ff "signature    = %s@,"  (T.signature_of_types er.error_signature);
-  Format.fprintf ff "@[<v 2>payload =@,";
-  List.iter (fun v -> V.pr_value ff v; Format.fprintf ff "@,") er.error_payload;
-  Format.fprintf ff "@]@,>@]@,"
+  F.fprintf ff "@[<v 4>  <Error@,";
+  F.fprintf ff "serial       = %Ld@," er.error_serial;
+  F.fprintf ff "name         = %s@,"  er.error_name;
+  F.fprintf ff "reply_serial = %Ld@," er.error_reply_serial;
+  F.fprintf ff "destination  = %s@,"  (pr_string_opt er.error_destination);
+  F.fprintf ff "sender       = %s@,"  (pr_string_opt er.error_sender);
+  F.fprintf ff "signature    = %s@,"  (T.signature_of_types er.error_signature);
+  F.fprintf ff "@[<v 2>payload =@,";
+  List.iter (fun v -> V.pr_value ff v; F.fprintf ff "@,") er.error_payload;
+  F.fprintf ff "@]@,>@]@,"
 
 let pr_signal ff sg =
-  Format.fprintf ff "@[<v 4>  <Signal@,";
-  Format.fprintf ff "serial       = %Ld@," sg.signal_serial;
-  Format.fprintf ff "path         = %s@,"  sg.signal_path;
-  Format.fprintf ff "interface    = %s@,"  sg.signal_interface;
-  Format.fprintf ff "member       = %s@,"  sg.signal_member;
-  Format.fprintf ff "destination  = %s@,"  (pr_string_opt sg.signal_destination);
-  Format.fprintf ff "sender       = %s@,"  (pr_string_opt sg.signal_sender);
-  Format.fprintf ff "signature    = %s@,"  (T.signature_of_types sg.signal_signature);
-  Format.fprintf ff "@[<v 2>payload =@,";
-  List.iter (fun v -> V.pr_value ff v; Format.fprintf ff "@,") sg.signal_payload;
-  Format.fprintf ff "@]@,>@]@,"
+  F.fprintf ff "@[<v 4>  <Signal@,";
+  F.fprintf ff "serial       = %Ld@," sg.signal_serial;
+  F.fprintf ff "path         = %s@,"  sg.signal_path;
+  F.fprintf ff "interface    = %s@,"  sg.signal_interface;
+  F.fprintf ff "member       = %s@,"  sg.signal_member;
+  F.fprintf ff "destination  = %s@,"  (pr_string_opt sg.signal_destination);
+  F.fprintf ff "sender       = %s@,"  (pr_string_opt sg.signal_sender);
+  F.fprintf ff "signature    = %s@,"  (T.signature_of_types sg.signal_signature);
+  F.fprintf ff "@[<v 2>payload =@,";
+  List.iter (fun v -> V.pr_value ff v; F.fprintf ff "@,") sg.signal_payload;
+  F.fprintf ff "@]@,>@]@,"
 
 let pr_msg ff = function
   | Msg_method_call mc   -> pr_method_call ff mc

@@ -57,7 +57,7 @@ let string_of_json ?(permissive=false) j =
           strict a.(0)
     | _             -> raise_unexpected_json_type (Json.string_of_type j) "string" in
     if not permissive then strict j else lenient j
-      
+
 let string_to_json s = Json.String s
 
 

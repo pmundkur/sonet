@@ -144,14 +144,12 @@ let create () =
     try Epoll_poller.create ()
     with _ -> Unix_poller.create ()
   in
-  {
-    conns = ConnMap.empty;
+  { conns = ConnMap.empty;
     timers = Timers.create ();
     poller = poller;
     current_time = 0.0;
     cur_events = [||];
-    cur_ev_indx = 0;
-  }
+    cur_ev_indx = 0 }
 
 (* connections *)
 
@@ -159,8 +157,7 @@ let register_conn t fd ?(enable_send=false) ?(enable_recv=true) callbacks =
   let conn_state = { callbacks = callbacks;
                      status = Connected;
                      send_enabled = enable_send;
-                     recv_enabled = enable_recv;
-                   }
+                     recv_enabled = enable_recv }
   in
     t.conns <- ConnMap.add fd conn_state t.conns;
     Unix.set_nonblock fd;

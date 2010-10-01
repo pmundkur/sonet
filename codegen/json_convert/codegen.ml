@@ -48,7 +48,9 @@ let name_of_var v =
     | d -> Printf.sprintf "%s_%d" v.stem d
 
 module Var_env = struct
-  module StringMap = Map.Make (struct type t = string let compare = compare end)
+  module StringMap = Map.Make (struct type t = string
+                                      let compare = compare
+                               end)
 
   type name_entry = { cur_mark: int; entries: var list; }
 
@@ -62,8 +64,9 @@ module Var_env = struct
   let new_env = StringMap.empty
 
   let new_var env full_name =
-    let var, new_entry = make_new_var (try StringMap.find full_name env
-                                       with Not_found -> new_name_entry) full_name in
+    let var, new_entry =
+      make_new_var (try StringMap.find full_name env
+                    with Not_found -> new_name_entry) full_name in
       var, (StringMap.add full_name new_entry env)
 
   let unqualify n =
@@ -77,12 +80,12 @@ module Var_env = struct
     new_var env (prefix ^ unqualify stem ^ suffix)
 
   let base_to_stem = function
-    | B_string -> "str"     | B_int -> "int"        | B_int64 -> "int64"
-    | B_bool -> "bool"      | B_float -> "float"    | B_ident s -> unqualify s
+    | B_string -> "str"  | B_int -> "int"      | B_int64 -> "int64"
+    | B_bool -> "bool"   | B_float -> "float"  | B_ident s -> unqualify s
 
   let complex_type_to_stem = function
-    | C_base b -> base_to_stem b    | C_option _ -> "opt"   | C_list _ -> "lst"
-    | C_array _ -> "arr"            | C_tuple _ -> "tup"    | C_record _ -> "rcd"
+    | C_base b -> base_to_stem b  | C_option _ -> "opt"  | C_list _ -> "lst"
+    | C_array _ -> "arr"          | C_tuple _ -> "tup"   | C_record _ -> "rcd"
     | C_variant _ -> "var"
 
   let new_ident_from_type env ct =
@@ -102,8 +105,9 @@ module Var_env = struct
   let new_idents_from_vars env ?(prefix="") ?(suffix="") vlist =
     let vlist, env =
       List.fold_left (fun (vlist, env) v ->
-                        let v, env' = new_ident_from_var env ~prefix ~suffix v in
-                          (v :: vlist), env'
+                        let v, env' =
+                          new_ident_from_var env ~prefix ~suffix v
+                        in (v :: vlist), env'
                      ) ([], env) vlist in
       (List.rev vlist), env
 end
@@ -168,7 +172,8 @@ module Pragma = struct
   let clist_to_str clist =
     let len = List.length clist in
     let s = String.create len in
-      ignore (List.fold_left (fun pos c -> s.[pos] <- c; (pos - 1)) (len-1) clist);
+      ignore (List.fold_left (fun pos c -> s.[pos] <- c; (pos - 1))
+                (len-1) clist);
       s
 
   let process_pragma ff p =
@@ -204,13 +209,16 @@ module To = struct
 
   let to_array_str ?(constr="") vlist =
     let elems = List.map name_of_var vlist in
-    let constr = if constr = "" then "" else "(Json_conv.string_to_json \"" ^ constr ^ "\"); " in
+    let constr = (if constr = "" then ""
+                  else "(Json_conv.string_to_json \"" ^ constr ^ "\"); ") in
       "[| " ^ constr ^ (String.concat "; " elems) ^ " |]"
 
   let to_object_str ?(is_record=false) fn_list fv_list =
     let elems = List.map2 (fun f v ->
-                             let f = if is_record then Pragma.json_field_name f else f in
-                               Printf.sprintf "(\"%s\", %s)" f (name_of_var v)
+                             let f =
+                               if is_record then Pragma.json_field_name f
+                               else f
+                             in Printf.sprintf "(\"%s\", %s)" f (name_of_var v)
                           ) fn_list fv_list in
       "[| " ^ (String.concat "; " elems) ^ " |]"
 
@@ -225,7 +233,8 @@ module To = struct
       match typ with
         | C_base bt ->
             (match bt with
-               | B_ident ident -> if not (is_known_type ident) then raise (Unknown_base_type ident)
+               | B_ident ident -> (if not (is_known_type ident)
+                                   then raise (Unknown_base_type ident))
                | _ -> ());
             fprintf ff "%s_to_json %s" (base_to_str bt) v
         | C_option optt ->
@@ -237,7 +246,8 @@ module To = struct
               fprintf ff "@]@,)"
         | C_list elemt ->
             let elemv, venv = Var_env.new_ident_from_type venv elemt in
-            let jlistv, venv = Var_env.new_ident_from_name venv v ~suffix:"_jlist" in
+            let jlistv, venv =
+              Var_env.new_ident_from_name venv v ~suffix:"_jlist" in
             let jlistvn = name_of_var jlistv in
               fprintf ff "@[<v 8>let %s = List.map@," jlistvn;
               fprintf ff "@[<v 8>(fun %s ->@," (name_of_var elemv);
@@ -246,7 +256,8 @@ module To = struct
               fprintf ff "Json.Array (Array.of_list %s)" jlistvn
         | C_array elemt ->
             let elemv, venv = Var_env.new_ident_from_type venv elemt in
-            let jarrayv, venv = Var_env.new_ident_from_name venv v ~suffix:"_jarray" in
+            let jarrayv, venv =
+              Var_env.new_ident_from_name venv v ~suffix:"_jarray" in
             let jarrayvn = name_of_var jarrayv in
               fprintf ff "@[<v 8>let %s = Array.map@," jarrayvn;
               fprintf ff "@[<v 8>(fun %s ->@," (name_of_var elemv);
@@ -255,7 +266,8 @@ module To = struct
               fprintf ff "Json.Array %s" jarrayvn
         | C_tuple ctlist ->
             let cvlist, venv = Var_env.new_idents_from_types venv ctlist in
-            let letvlist, venv = Var_env.new_idents_from_vars venv ~prefix:"j_" cvlist in
+            let letvlist, venv =
+              Var_env.new_idents_from_vars venv ~prefix:"j_" cvlist in
             let cvtlist = List.combine cvlist ctlist in
               fprintf ff "(match %s with@," v;
               fprintf ff "@[<v 8>| %s ->@," (prod_vars_to_str cvlist);
@@ -266,13 +278,15 @@ module To = struct
         | C_record cls ->
             let fnlist, ftlist = List.split cls in
             let fvlist, venv = Var_env.new_idents_from_types venv ftlist in
-            let letvlist, venv = Var_env.new_idents_from_vars venv ~prefix:"j_" fvlist in
+            let letvlist, venv =
+              Var_env.new_idents_from_vars venv ~prefix:"j_" fvlist in
               fprintf ff "(match %s with@," v;
               fprintf ff "@[<v 8>| %s ->@," (to_record_str fnlist fvlist);
               List.iter2 (fun letv (fv, ft) ->
                             let_bind ff venv letv fv ft
                          ) letvlist (List.combine fvlist ftlist);
-              fprintf ff "Json.Object %s@]@,)" (to_object_str ~is_record:true fnlist letvlist)
+              fprintf ff "Json.Object %s@]@,)" (to_object_str ~is_record:true
+                                                  fnlist letvlist)
         | C_variant cdlist ->
             fprintf ff "(match %s with@," v;
             List.iter (fun cd -> variant ff venv cd) cdlist;
@@ -280,7 +294,8 @@ module To = struct
 
   and variant ff venv (CD_tuple (vname, vtlist)) =
     let vlist, venv = Var_env.new_idents_from_types venv vtlist in
-    let letvlist, venv = Var_env.new_idents_from_vars venv ~prefix:"j_" vlist in
+    let letvlist, venv =
+      Var_env.new_idents_from_vars venv ~prefix:"j_" vlist in
       if List.length vlist = 0 then
         fprintf ff "@[<v 8>| %s ->@," vname
       else
@@ -324,7 +339,8 @@ module From = struct
       match typ with
         | C_base bt ->
             (match bt with
-               | B_ident ident -> if not (is_known_type ident) then raise (Unknown_base_type ident)
+               | B_ident ident -> (if not (is_known_type ident)
+                                   then raise (Unknown_base_type ident))
                | _ -> ());
             fprintf ff "%s_of_json %s" (base_to_str bt) v
         | C_option optt ->
@@ -336,7 +352,8 @@ module From = struct
               fprintf ff ")@]@,)"
         | C_list elemt ->
             let elemv, venv = Var_env.new_ident_from_type venv elemt in
-            let oarrayv, venv = Var_env.new_ident_from_name venv v ~suffix:"_oarray" in
+            let oarrayv, venv =
+              Var_env.new_ident_from_name venv v ~suffix:"_oarray" in
             let oarrayvn = name_of_var oarrayv in
               fprintf ff "@[<v 8>let %s = Array.map@," oarrayvn;
               fprintf ff "@[<v 8>(fun %s ->@," (name_of_var elemv);
@@ -345,7 +362,8 @@ module From = struct
               fprintf ff "Array.to_list %s" oarrayvn
         | C_array elemt ->
             let elemv, venv = Var_env.new_ident_from_type venv elemt in
-            let oarrayv, venv = Var_env.new_ident_from_name venv v ~suffix:"_oarray" in
+            let oarrayv, venv =
+              Var_env.new_ident_from_name venv v ~suffix:"_oarray" in
             let oarrayvn = name_of_var oarrayv in
               fprintf ff "@[<v 8>let %s = Array.map@," oarrayvn;
               fprintf ff "@[<v 8>(fun %s ->@," (name_of_var elemv);
@@ -353,28 +371,42 @@ module From = struct
               fprintf ff "@]@,) (Json_conv.get_array %s) in@]@," v;
               fprintf ff "%s" oarrayvn
         | C_tuple ctlist ->
-            let jarrayv, venv = Var_env.new_ident_from_name venv v ~suffix:"_jarray" in
+            let jarrayv, venv =
+              Var_env.new_ident_from_name venv v ~suffix:"_jarray" in
             let jarrayvn = name_of_var jarrayv in
             let letvlist, venv = Var_env.new_idents_from_types venv ctlist in
               fprintf ff "let %s = Json_conv.get_array %s in@," jarrayvn v;
-              fprintf ff "Json_conv.check_array_with_length %s %d;@," jarrayvn (List.length ctlist);
-              ignore (List.fold_left (fun indx (letv, ct) ->
-                                        let inv, venv = Var_env.new_ident_from_name venv "tindx" in
-                                          fprintf ff "let %s = %s.(%d) in@," (name_of_var inv) jarrayvn indx;
-                                          let_bind ff venv letv inv ct tname;
-                                          indx + 1
-                                     ) 0 (List.combine letvlist ctlist));
+              fprintf ff "Json_conv.check_array_with_length %s %d;@,"
+                jarrayvn (List.length ctlist);
+              ignore (List.fold_left
+                        (fun indx (letv, ct) ->
+                           let inv, venv =
+                             Var_env.new_ident_from_name venv "tindx"
+                           in fprintf ff "let %s = %s.(%d) in@,"
+                                (name_of_var inv) jarrayvn indx;
+                             let_bind ff venv letv inv ct tname;
+                             indx + 1
+                        ) 0 (List.combine letvlist ctlist));
               fprintf ff "%s" (to_tuple_str letvlist)
         | C_record cls ->
             let fnlist, ftlist = List.split cls in
             let letvlist, venv = Var_env.new_idents_from_types venv ftlist in
-            let objtv, venv = Var_env.new_ident_from_name venv v ~suffix:"_ftable" in
+            let objtv, venv =
+              Var_env.new_ident_from_name venv v ~suffix:"_ftable" in
             let objtvn = name_of_var objtv in
-              fprintf ff "let %s = Json_conv.get_object_table %s in@," objtvn v;
+              fprintf ff "let %s = Json_conv.get_object_table %s in@,"
+                objtvn v;
               List.iter2 (fun letv (fn, ft) ->
-                            let fvar, venv = Var_env.new_ident_from_name venv ~suffix:"_f" fn in
-                            let optional = match ft with C_option _ -> "optional_" | _ -> "" in
-                              fprintf ff "let %s = Json_conv.get_%sobject_field %s \"%s\" in@," (name_of_var fvar) optional objtvn (Pragma.json_field_name fn);
+                            let fvar, venv =
+                              Var_env.new_ident_from_name venv ~suffix:"_f" fn
+                            in let optional =
+                                match ft with
+                                  | C_option _ -> "optional_"
+                                  | _ -> ""
+                            in
+                              fprintf ff "let %s = Json_conv.get_%sobject_field %s \"%s\" in@,"
+                                (name_of_var fvar) optional objtvn
+                                (Pragma.json_field_name fn);
                               let_bind ff venv letv fvar ft tname
                          ) letvlist cls;
               fprintf ff "%s" (to_record_str fnlist letvlist)
@@ -396,13 +428,18 @@ module From = struct
     let argsvn = name_of_var argsv in
     let vtlen = List.length vtlist in
     let vlist, venv = Var_env.new_idents_from_types venv vtlist in
-    let letvlist, venv = Var_env.new_idents_from_vars venv ~prefix:"o_" vlist in
+    let letvlist, venv =
+      Var_env.new_idents_from_vars venv ~prefix:"o_" vlist in
       fprintf ff "@[<v 8>| \"%s\" ->@," vname;
       if vtlen > 0 then
-        fprintf ff "Json_conv.check_array_with_length %s %d;@," argsvn (vtlen + 1);
+        fprintf ff "Json_conv.check_array_with_length %s %d;@,"
+          argsvn (vtlen + 1);
       ignore (List.fold_left (fun indx (letv, vt) ->
-                                let inv, venv = Var_env.new_ident_from_name venv "aindx" in
-                                  fprintf ff "let %s = %s.(%d) in@," (name_of_var inv) argsvn indx;
+                                let inv, venv =
+                                  Var_env.new_ident_from_name venv "aindx"
+                                in
+                                  fprintf ff "let %s = %s.(%d) in@,"
+                                    (name_of_var inv) argsvn indx;
                                   let_bind ff venv letv inv vt tname;
                                   indx + 1
                              ) 1 (List.combine letvlist vtlist));

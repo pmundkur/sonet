@@ -75,8 +75,10 @@ type client_proto =
   | Client_error of string
 
 let client_proto_to_string = function
-  | Client_auth (mech, None) -> Printf.sprintf "AUTH %s" mech
-  | Client_auth (mech, Some init_resp) -> Printf.sprintf "AUTH %s %s" mech init_resp
+  | Client_auth (mech, None) ->
+      Printf.sprintf "AUTH %s" mech
+  | Client_auth (mech, Some init_resp) ->
+      Printf.sprintf "AUTH %s %s" mech init_resp
   | Client_cancel -> "CANCEL"
   | Client_begin -> "BEGIN"
   | Client_data data -> Printf.sprintf "DATA %s" data
@@ -94,13 +96,16 @@ let server_proto_of_string s =
   let try_match_cmd cmd =
     let clen = String.length cmd in
       if slen >= clen && String.sub s 0 clen = cmd
-      then Some (if slen = clen then "" else String.sub s (clen + 1) (slen - clen - 1))
+      then Some (if slen = clen then ""
+                 else String.sub s (clen + 1) (slen - clen - 1))
       else None
   in
-    match try_match_cmd "REJECTED" with | Some options -> Server_rejected options | None ->
-       (match try_match_cmd "OK" with | Some o -> Server_ok o | None ->
+    match try_match_cmd "REJECTED" with
+      | Some options -> Server_rejected options
+      | None ->
+          (match try_match_cmd "OK" with | Some o -> Server_ok o | None ->
           (match try_match_cmd "DATA" with | Some d -> Server_data d | None ->
-             (match try_match_cmd "ERROR" with | Some _ -> Server_error | None ->
+          (match try_match_cmd "ERROR" with | Some _ -> Server_error | None ->
                 Server_other s)))
 
 (* Client parsing state and protocol state machine *)
@@ -150,7 +155,8 @@ let process_server_cmd ctxt sender s consumed =
                       Auth_in_progress
                )
            | Server_rejected _ ->
-               (* TODO: attempt via a hitherto untried mechanism, before failing *)
+               (* TODO: attempt via a hitherto untried mechanism,
+                  before failing *)
                Auth_failed
            | Server_error ->
                ctxt.state <- Waiting_for_reject;
@@ -169,7 +175,8 @@ let process_server_cmd ctxt sender s consumed =
                send Client_begin;
                Auth_succeeded (server_addr, consumed)
            | Server_rejected _ ->
-               (* TODO: attempt via a hitherto untried mechanism, before failing *)
+               (* TODO: attempt via a hitherto untried mechanism,
+                  before failing *)
                Auth_failed
            | Server_error
            | Server_data _ ->
@@ -183,7 +190,8 @@ let process_server_cmd ctxt sender s consumed =
     | Waiting_for_reject ->
         (match server_proto with
            | Server_rejected _ ->
-               (* TODO: attempt via a hitherto untried mechanism, before failing *)
+               (* TODO: attempt via a hitherto untried mechanism,
+                  before failing *)
                Auth_failed
            | Server_ok _
            | Server_data _
@@ -206,12 +214,11 @@ let init_client_context mech_type sender =
       else Client_auth (mech_str, Some init_resp)
     in
       sender (Printf.sprintf "%s\r\n" (client_proto_to_string proto)) in
-  let make_context init_state =
-    {
-      state = init_state;
-      cursor = Line [];
-      mechanism = mech;
-    }
+  let make_context init_state = {
+    state = init_state;
+    cursor = Line [];
+    mechanism = mech;
+  }
   in match mech#init with
     | Mech_continue init_resp ->
         send init_resp;

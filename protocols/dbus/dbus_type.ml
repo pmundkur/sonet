@@ -50,7 +50,8 @@ let rec to_string = function
   | T_base B_signature   -> "signature"
   | T_variant            -> "variant"
   | T_array t            -> "array(" ^ (to_string t) ^ ")"
-  | T_struct tl          -> "struct(" ^ String.concat "," (List.map to_string tl) ^ ")"
+  | T_struct tl          ->
+      "struct(" ^ String.concat "," (List.map to_string tl) ^ ")"
 
 let rec to_code = function
   | T_base B_byte        -> "y"
@@ -67,7 +68,8 @@ let rec to_code = function
   | T_base B_signature   -> "g"
   | T_variant            -> "v"
   | T_array t            -> "a" ^ (to_code t)
-  | T_struct tl          -> "(" ^ String.concat "" (List.map to_string tl) ^ ")"
+  | T_struct tl          ->
+      "(" ^ String.concat "" (List.map to_string tl) ^ ")"
 
 let is_basic_type = function
   | T_base _ -> true
@@ -166,7 +168,8 @@ let rec get_complete_type clist in_array =
           let t, rem = get_struct_type '}' rem in
             if is_valid_dict_entry t
             then t, rem
-            else raise_sig_error (Sig_invalid "dict_entry not in array context")
+            else raise_sig_error (Sig_invalid
+                                    "dict_entry not in array context")
     | c :: _ ->
         raise_sig_error (Sig_invalid_char c)
 

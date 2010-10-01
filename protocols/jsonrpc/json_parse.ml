@@ -38,21 +38,19 @@ type int_value =
   | IObject_needs_value of (string * Json.t) list * string
   | IArray of Json.t list
 
-type parse_state =
-    {
-      mutable cursor: cursor;
-      mutable stack: int_value list;
-      mutable num_chars_parsed: int;
-      mutable line_num: int
-    }
+type parse_state = {
+  mutable cursor: cursor;
+  mutable stack: int_value list;
+  mutable num_chars_parsed: int;
+  mutable line_num: int
+}
 
-let init_parse_state () =
-  {
-    cursor = Start;
-    stack = [];
-    num_chars_parsed = 0;
-    line_num = 1
-  }
+let init_parse_state () = {
+  cursor = Start;
+  stack = [];
+  num_chars_parsed = 0;
+  line_num = 1
+}
 
 let is_parsing_object s =
   match s.stack with

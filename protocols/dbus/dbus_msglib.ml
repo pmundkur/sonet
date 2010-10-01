@@ -30,39 +30,66 @@ let raise_error e =
 
 let make_peer_ping_msg ~destination ~serial =
   M.method_call
-    ~serial ~destination ~interface:"org.freedesktop.DBus.Peer"
-    ~member:"Ping" ~signature:[] []
+    ~serial
+    ~destination
+    ~interface:"org.freedesktop.DBus.Peer"
+    ~member:"Ping"
+    ~signature:[]
+    []
 
 let make_peer_get_machine_id_msg ~destination ~serial =
   M.method_call
-    ~serial ~destination ~interface:"org.freedesktop.DBus.Peer"
-    ~member:"GetMachineId" ~signature:[] []
+    ~serial
+    ~destination
+    ~interface:"org.freedesktop.DBus.Peer"
+    ~member:"GetMachineId"
+    ~signature:[]
+    []
 
 let make_introspect_msg ~destination ~serial =
   M.method_call
-    ~serial ~destination ~interface:"org.freedesktop.DBus.Introspectable"
-    ~member:"Introspect" ~signature:[] []
+    ~serial
+    ~destination
+    ~interface:"org.freedesktop.DBus.Introspectable"
+    ~member:"Introspect"
+    ~signature:[]
+    []
 
 let make_property_get_msg ~destination ~serial ~interface ~property =
   let signature = [ (T.T_base T.B_string); (T.T_base T.B_string) ] in
   let payload = [ (V.V_string interface); (V.V_string property) ] in
   M.method_call
-    ~serial ~destination ~interface:"org.freedesktop.DBus.Properties"
-    ~member:"Get" ~signature payload
+    ~serial
+    ~destination
+    ~interface:"org.freedesktop.DBus.Properties"
+    ~member:"Get"
+    ~signature
+    payload
 
-let make_property_set_msg ~destination ~serial ~interface ~property ~val_type ~value =
+let make_property_set_msg ~destination ~serial ~interface ~property
+    ~val_type ~value =
   let signature = [ T.T_base T.B_string; T.T_base T.B_string; T.T_variant ] in
-  let payload = [ V.V_string interface; V.V_string property; V.V_variant (val_type, value) ] in
-  M.method_call
-    ~serial ~destination ~interface:"org.freedesktop.DBus.Properties"
-    ~member:"Set" ~signature payload
+  let payload = [ V.V_string interface;
+                  V.V_string property;
+                  V.V_variant (val_type, value) ] in
+    M.method_call
+      ~serial
+      ~destination
+      ~interface:"org.freedesktop.DBus.Properties"
+      ~member:"Set"
+      ~signature
+      payload
 
 let make_property_getall_msg ~destination ~serial ~interface =
   let signature = [ T.T_base T.B_string ] in
   let payload = [ V.V_string interface ] in
-  M.method_call
-    ~serial ~destination ~interface:"org.freedesktop.DBus.Properties"
-    ~member:"GetAll" ~signature payload
+    M.method_call
+      ~serial
+      ~destination
+      ~interface:"org.freedesktop.DBus.Properties"
+      ~member:"GetAll"
+      ~signature
+      payload
 
 type name_flag =
   | Name_allow_replacement
@@ -93,15 +120,23 @@ let make_request_name_msg ~serial ~name ~flags =
   let signature = [ T.T_base T.B_string; T.T_base T.B_uint32 ] in
   let payload = [ V.V_string name; V.V_uint32 (Int64.of_int flags) ] in
     M.method_call
-      ~serial ~destination:"org.freedesktop.DBus" ~interface:"org.freedesktop.DBus"
-      ~member:"RequestName" ~signature payload
+      ~serial
+      ~destination:"org.freedesktop.DBus"
+      ~interface:"org.freedesktop.DBus"
+      ~member:"RequestName"
+      ~signature
+      payload
 
 let make_release_name_msg ~serial ~name =
   let signature = [ T.T_base T.B_string ] in
   let payload = [ V.V_string name ] in
     M.method_call
-      ~serial ~destination:"org.freedesktop.DBus" ~interface:"org.freedesktop.DBus"
-      ~member:"ReleaseName" ~signature payload
+      ~serial
+      ~destination:"org.freedesktop.DBus"
+      ~interface:"org.freedesktop.DBus"
+      ~member:"ReleaseName"
+      ~signature
+      payload
 
 type release_name_reply =
   | Release_name_reply_released
@@ -116,25 +151,41 @@ let release_name_reply_of_int = function
 
 let make_hello_msg ~serial =
   M.method_call
-    ~serial ~destination:"org.freedesktop.DBus" ~interface:"org.freedesktop.DBus"
-    ~member:"Hello" ~signature:[] []
+    ~serial
+    ~destination:"org.freedesktop.DBus"
+    ~interface:"org.freedesktop.DBus"
+    ~member:"Hello"
+    ~signature:[]
+    []
 
 let make_list_names_msg ~serial =
   M.method_call
-    ~serial ~destination:"org.freedesktop.DBus" ~interface:"org.freedesktop.DBus"
-    ~member:"ListNames" ~signature:[] []
+    ~serial
+    ~destination:"org.freedesktop.DBus"
+    ~interface:"org.freedesktop.DBus"
+    ~member:"ListNames"
+    ~signature:[]
+    []
 
 let make_list_activatable_names_msg ~serial =
   M.method_call
-    ~serial ~destination:"org.freedesktop.DBus" ~interface:"org.freedesktop.DBus"
-    ~member:"ListActivatableNames" ~signature:[] []
+    ~serial
+    ~destination:"org.freedesktop.DBus"
+    ~interface:"org.freedesktop.DBus"
+    ~member:"ListActivatableNames"
+    ~signature:[]
+    []
 
 let make_name_has_owner_msg ~serial ~name =
   let signature = [ T.T_base T.B_string ] in
   let payload = [ V.V_string name ] in
     M.method_call
-      ~serial ~destination:"org.freedesktop.DBus" ~interface:"org.freedesktop.DBus"
-      ~member:"NameHasOwner" ~signature payload
+      ~serial
+      ~destination:"org.freedesktop.DBus"
+      ~interface:"org.freedesktop.DBus"
+      ~member:"NameHasOwner"
+      ~signature
+      payload
 
 type service_start_reply =
   | Service_start_reply_success
@@ -149,38 +200,62 @@ let make_start_service_by_name_msg ~serial ~name =
   let signature = [ T.T_base T.B_string; T.T_base T.B_uint32 ] in
   let payload = [ V.V_string name; V.V_uint32 (Int64.of_int 0) ] in
     M.method_call
-      ~serial ~destination:"org.freedesktop.DBus" ~interface:"org.freedesktop.DBus"
-      ~member:"StartServiceByName" ~signature payload
+      ~serial
+      ~destination:"org.freedesktop.DBus"
+      ~interface:"org.freedesktop.DBus"
+      ~member:"StartServiceByName"
+      ~signature
+      payload
 
 let make_get_name_owner_msg ~serial ~name =
   let signature = [ T.T_base T.B_string ] in
   let payload = [ V.V_string name ] in
     M.method_call
-      ~serial ~destination:"org.freedesktop.DBus" ~interface:"org.freedesktop.DBus"
-      ~member:"GetNameOwner" ~signature payload
+      ~serial
+      ~destination:"org.freedesktop.DBus"
+      ~interface:"org.freedesktop.DBus"
+      ~member:"GetNameOwner"
+      ~signature
+      payload
 
 let make_get_connection_unix_user_msg ~serial ~connection_name =
   let signature = [ T.T_base T.B_string ] in
   let payload = [ V.V_string connection_name ] in
     M.method_call
-      ~serial ~destination:"org.freedesktop.DBus" ~interface:"org.freedesktop.DBus"
-      ~member:"GetConnectionUnixUser" ~signature payload
+      ~serial
+      ~destination:"org.freedesktop.DBus"
+      ~interface:"org.freedesktop.DBus"
+      ~member:"GetConnectionUnixUser"
+      ~signature
+      payload
 
 let make_add_match_msg ~serial ~filter =
   let signature = [ T.T_base T.B_string ] in
   let payload = [ V.V_string filter ] in
     M.method_call
-      ~serial ~destination:"org.freedesktop.DBus" ~interface:"org.freedesktop.DBus"
-      ~member:"AddMatch" ~signature payload
+      ~serial
+      ~destination:"org.freedesktop.DBus"
+      ~interface:"org.freedesktop.DBus"
+      ~member:"AddMatch"
+      ~signature
+      payload
 
 let make_remove_match_msg ~serial ~filter =
   let signature = [ T.T_base T.B_string ] in
   let payload = [ V.V_string filter ] in
     M.method_call
-      ~serial ~destination:"org.freedesktop.DBus" ~interface:"org.freedesktop.DBus"
-      ~member:"RemoveMatch" ~signature payload
+      ~serial
+      ~destination:"org.freedesktop.DBus"
+      ~interface:"org.freedesktop.DBus"
+      ~member:"RemoveMatch"
+      ~signature
+      payload
 
 let make_get_id_msg ~serial =
   M.method_call
-    ~serial ~destination:"org.freedesktop.DBus" ~interface:"org.freedesktop.DBus"
-    ~member:"GetId" ~signature:[] []
+    ~serial
+    ~destination:"org.freedesktop.DBus"
+    ~interface:"org.freedesktop.DBus"
+    ~member:"GetId"
+    ~signature:[]
+    []

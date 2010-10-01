@@ -40,7 +40,9 @@ let name_of_var v =
     | d -> Printf.sprintf "%s_%d" v.stem d
 
 module Var_env = struct
-  module StringMap = Map.Make (struct type t = string let compare = compare end)
+  module StringMap = Map.Make (struct type t = string
+                                      let compare = compare
+                               end)
 
   type name_entry = { cur_mark: int; entries: var list; }
 
@@ -54,8 +56,9 @@ module Var_env = struct
   let new_env = StringMap.empty
 
   let new_var env full_name =
-    let var, new_entry = make_new_var (try StringMap.find full_name env
-                                       with Not_found -> new_name_entry) full_name in
+    let var, new_entry =
+      make_new_var (try StringMap.find full_name env
+                    with Not_found -> new_name_entry) full_name in
       var, (StringMap.add full_name new_entry env)
 
   let new_ident_from_name env ?(api = false) ?(prefix="") ?(suffix="") stem =
@@ -64,8 +67,9 @@ module Var_env = struct
   let new_idents_from_names env ?(prefix="") ?(suffix="") names =
     let vlist, env =
       List.fold_left (fun (vlist, env) n ->
-                        let v, env' = new_ident_from_name env ~prefix ~suffix n in
-                          (v :: vlist), env'
+                        let v, env' =
+                          new_ident_from_name env ~prefix ~suffix n
+                        in (v :: vlist), env'
                      ) ([], env) names in
       (List.rev vlist), env
 end
@@ -93,7 +97,8 @@ module Server = struct
       List.iter (fun (rpc, resp) ->
                    let sg = get_arg_types rpc.rpc_request.request_params in
                    let sg = sg @ [ "'a"; resp.response_value.param_type ] in
-                     fprintf ff "@,%s: %s;" rpc.rpc_request.request_handler (String.concat " -> " sg)
+                     fprintf ff "@,%s: %s;"
+                       rpc.rpc_request.request_handler (String.concat " -> " sg)
                 ) rpc_list;
       if List.length notif_list > 0 then
         (if List.length rpc_list > 0
@@ -102,7 +107,8 @@ module Server = struct
       List.iter (fun n ->
                    let sg = get_arg_types n.rpc_request.request_params in
                    let sg = sg @ [ "'a"; "unit" ] in
-                     fprintf ff "@,%s: %s;" n.rpc_request.request_handler (String.concat " -> " sg)
+                     fprintf ff "@,%s: %s;"
+                       n.rpc_request.request_handler (String.concat " -> " sg)
                 ) notif_list;
       (match server.server_message_filter with
          | Some f ->
@@ -111,7 +117,8 @@ module Server = struct
          | None -> ()
       );
       fprintf ff "@,@,(* Exception error handler *)";
-      fprintf ff "@,%s: exn -> 'a -> Jsonrpc.rpc_error; " server.server_error_handler;
+      fprintf ff "@,%s: exn -> 'a -> Jsonrpc.rpc_error; "
+        server.server_error_handler;
       fprintf ff "@]@\n}@\n@\n";
       sig_name
 
@@ -137,7 +144,8 @@ module Server = struct
 
   let gen_param ff venv otvn _i p =
     let arg, venv = Var_env.new_ident_from_name venv p.param_name in
-      fprintf ff "let %s = %s (Json_conv.get_object_field %s \"%s\") in@," (name_of_var arg) (Type_conv.of_json p.param_type) otvn p.param_name;
+      fprintf ff "let %s = %s (Json_conv.get_object_field %s \"%s\") in@,"
+        (name_of_var arg) (Type_conv.of_json p.param_type) otvn p.param_name;
       arg, venv
 
   let gen_request ff venv reqv impl_module cbvn rpc resp =
@@ -151,20 +159,24 @@ module Server = struct
            | [] ->
                "()", venv
            | _  ->
-               fprintf ff "let %s = Json_conv.get_object_table %s.Jsonrpc.params in@," otvn reqvn;
+               fprintf ff "let %s = Json_conv.get_object_table %s.Jsonrpc.params in@,"
+                 otvn reqvn;
                let paramsv, venv, _ =
                  List.fold_left (fun (alist, venv, i) p ->
                                    let a, venv = gen_param ff venv otvn i p in
                                      (a :: alist), venv, (i + 1)
-                                ) ([], venv, 0) params in
-                 (String.concat " " (List.map (fun v -> name_of_var v) (List.rev paramsv))), venv
+                                ) ([], venv, 0) params
+               in (String.concat " " (List.map (fun v -> name_of_var v)
+                                        (List.rev paramsv))), venv
         )
       in
       let respv, venv = Var_env.new_ident_from_name venv "resp" in
       let respjv, _venv = Var_env.new_ident_from_name venv "resp_j" in
       let respvn, respjvn = name_of_var respv, name_of_var respjv in
-        fprintf ff "let %s = %s.%s %s %s in@," respvn impl_module methname args_str cbvn;
-        fprintf ff "let %s = %s %s in@," respjvn (Type_conv.to_json resp.response_value.param_type) respvn;
+        fprintf ff "let %s = %s.%s %s %s in@,"
+          respvn impl_module methname args_str cbvn;
+        fprintf ff "let %s = %s %s in@,"
+          respjvn (Type_conv.to_json resp.response_value.param_type) respvn;
         fprintf ff "Jsonrpc.Result %s@]@," respjvn
 
   let gen_notification ff venv reqv impl_module cbvn rpc =
@@ -178,62 +190,81 @@ module Server = struct
            | [] ->
                "()", venv
            | _  ->
-               fprintf ff "let %s = Json_conv.get_object_table %s.Jsonrpc.params in@," otvn reqvn;
+               fprintf ff "let %s = Json_conv.get_object_table %s.Jsonrpc.params in@,"
+                 otvn reqvn;
                let paramsv, venv, _ =
                  List.fold_left (fun (alist, venv, i) p ->
                                    let a, venv = gen_param ff venv otvn i p in
                                      (a :: alist), venv, (i + 1)
-                                ) ([], venv, 0) params in
-                 (String.concat " " (List.map (fun v -> name_of_var v) (List.rev paramsv))), venv
+                                ) ([], venv, 0) params
+               in (String.concat " " (List.map (fun v -> name_of_var v)
+                                        (List.rev paramsv))), venv
         )
       in
         fprintf ff "%s.%s %s %s@]@," impl_module methname args_str cbvn
 
   let gen_notification_dispatch ff venv _server impl_module nlist =
-    let dispv, venv = Var_env.new_ident_from_name ~api:true venv "dispatch_notification" in
+    let dispv, venv =
+      Var_env.new_ident_from_name ~api:true venv "dispatch_notification" in
     let reqv, venv = Var_env.new_ident_from_name venv "req" in
     let cbv, venv = Var_env.new_ident_from_name venv "callback_arg" in
     let implv, venv = Var_env.new_ident_from_name venv impl_module in
-    let reqvn, cbvn, implvn = name_of_var reqv, name_of_var cbv, name_of_var implv in
-      fprintf ff "@[<v 8>let %s %s %s %s =@," (name_of_var dispv) implvn reqvn cbvn;
+    let reqvn, cbvn, implvn =
+      name_of_var reqv, name_of_var cbv, name_of_var implv
+    in
+      fprintf ff "@[<v 8>let %s %s %s %s =@,"
+        (name_of_var dispv) implvn reqvn cbvn;
       fprintf ff "match %s.Jsonrpc.method_name with@," reqvn;
       List.iter (fun n -> gen_notification ff venv reqv implvn cbvn n) nlist;
-      fprintf ff "| _ -> raise (Jsonrpc.Unknown_request %s.Jsonrpc.method_name)@]@,@\n" reqvn
+      fprintf ff "| _ -> raise (Jsonrpc.Unknown_request %s.Jsonrpc.method_name)@]@,@\n"
+        reqvn
 
   let gen_rpc_dispatch ff venv server impl_module rpcs =
-    let dispv, venv = Var_env.new_ident_from_name ~api:true venv "dispatch_rpc" in
+    let dispv, venv =
+      Var_env.new_ident_from_name ~api:true venv "dispatch_rpc" in
     let reqidjv, venv = Var_env.new_ident_from_name venv "req_id_j" in
     let reqv, venv = Var_env.new_ident_from_name venv "req" in
     let implv, venv = Var_env.new_ident_from_name venv impl_module in
     let pv, venv = Var_env.new_ident_from_name venv "payload" in
     let cbv, venv = Var_env.new_ident_from_name venv "callback_arg" in
-    let reqidjvn, reqvn, implvn = name_of_var reqidjv, name_of_var reqv, name_of_var implv in
+    let reqidjvn, reqvn, implvn =
+      name_of_var reqidjv, name_of_var reqv, name_of_var implv in
     let pvn, cbvn = name_of_var pv, name_of_var cbv in
-      fprintf ff "@[<v 8>let %s %s %s %s %s =@," (name_of_var dispv) implvn reqidjvn reqvn cbvn;
+      fprintf ff "@[<v 8>let %s %s %s %s %s =@,"
+        (name_of_var dispv) implvn reqidjvn reqvn cbvn;
       (match server.server_message_filter with
-         | Some f -> fprintf ff "%s.%s %s.Jsonrpc.method_name %s;@," implvn f reqvn cbvn
+         | Some f ->
+             fprintf ff "%s.%s %s.Jsonrpc.method_name %s;@,"
+               implvn f reqvn cbvn
          | None -> ()
       );
       fprintf ff "@[<v 8>let %s =@," pvn;
       fprintf ff "@[<v 8>(try@,";
       fprintf ff "match %s.Jsonrpc.method_name with@," reqvn;
-      List.iter (fun (rpc, resp) -> gen_request ff venv reqv implvn cbvn rpc resp) rpcs;
-      fprintf ff "| _ -> raise (Jsonrpc.Unknown_request %s.Jsonrpc.method_name)@]@," reqvn;
+      List.iter (fun (rpc, resp) ->
+                   gen_request ff venv reqv implvn cbvn rpc resp
+                ) rpcs;
+      fprintf ff "| _ -> raise (Jsonrpc.Unknown_request %s.Jsonrpc.method_name)@]@,"
+        reqvn;
       let ev, venv = Var_env.new_ident_from_name venv "e" in
       let errv, _venv = Var_env.new_ident_from_name venv "err" in
       let evn, errvn = name_of_var ev, name_of_var errv in
         fprintf ff "@[<v 8> with %s ->@," evn;
-        fprintf ff "let %s = %s.%s %s %s in@," errvn implvn server.server_error_handler evn cbvn;
+        fprintf ff "let %s = %s.%s %s %s in@,"
+          errvn implvn server.server_error_handler evn cbvn;
         fprintf ff "Jsonrpc.Error %s)@]@]@," errvn;
         fprintf ff "in@,";
-        fprintf ff "Jsonrpc.response_to_json { Jsonrpc.response_id = %s; Jsonrpc.response = %s }@]@,@\n" reqidjvn pvn
+        fprintf ff "Jsonrpc.response_to_json { Jsonrpc.response_id = %s; Jsonrpc.response = %s }@]@,@\n"
+          reqidjvn pvn
 
   let gen_dispatch ff impl_name =
     fprintf ff "@[<v 8>let dispatch %s req_j callback_arg =@," impl_name;
     fprintf ff "let req = Jsonrpc.request_of_json req_j in@,";
     fprintf ff "match req.Jsonrpc.request_id with@,";
-    fprintf ff "| None -> ignore (dispatch_notification %s req callback_arg); None@," impl_name;
-    fprintf ff "| Some id -> Some (dispatch_rpc %s id req callback_arg)@]@,@\n" impl_name
+    fprintf ff "| None -> ignore (dispatch_notification %s req callback_arg); None@,"
+      impl_name;
+    fprintf ff "| Some id -> Some (dispatch_rpc %s id req callback_arg)@]@,@\n"
+      impl_name
 end
 
 module Client = struct
@@ -249,9 +280,11 @@ module Client = struct
 
   let gen_handler_type ff resp =
     let resp_type = resp.response_value.param_type in
-      fprintf ff "@,val %s : %s -> context -> unit" resp.response_handler resp_type
+      fprintf ff "@,val %s : %s -> context -> unit"
+        resp.response_handler resp_type
 
-  let client_modname s = Printf.sprintf "%s_client" (String.capitalize s.server_name)
+  let client_modname s =
+    Printf.sprintf "%s_client" (String.capitalize s.server_name)
 
   let gen_resp_name resp =
     Printf.sprintf "jresp_%s" (gen_method_name resp.response_handler)
@@ -273,7 +306,8 @@ module Client = struct
 
   let start_maker ff s =
     let modname = client_modname s in
-      fprintf ff "module Make_%s_client (%s : %s) =@\n" (String.lowercase s.server_name) modname modname;
+      fprintf ff "module Make_%s_client (%s : %s) =@\n"
+        (String.lowercase s.server_name) modname modname;
       fprintf ff "@[<v 8>struct";
       modname
 
@@ -309,13 +343,16 @@ module Client = struct
              fprintf ff "@,@[<v 8>let jrpc_%s () =@," meth_name;
              ""
          | _  ->
-             fprintf ff "@,@[<v 8>let jrpc_%s %s =@," meth_name (String.concat " " (List.map name_of_var avlist));
+             fprintf ff "@,@[<v 8>let jrpc_%s %s =@,"
+               meth_name (String.concat " " (List.map name_of_var avlist));
              List.iter2 (fun p (a, v) ->
                            fprintf ff "let %s = %s %s in@,"
-                             (name_of_var v) (Type_conv.to_json p.param_type) (name_of_var a)
+                             (name_of_var v)
+                             (Type_conv.to_json p.param_type) (name_of_var a)
                         ) params (List.combine avlist vvlist);
              String.concat "; " (List.map2 (fun a v ->
-                                              Printf.sprintf "\"%s\", %s" a (name_of_var v)
+                                              Printf.sprintf "\"%s\", %s"
+                                                a (name_of_var v)
                                            ) args vvlist
                                 )
       ) in
@@ -323,12 +360,15 @@ module Client = struct
          | None ->
              fprintf ff "let %s = None in@," jrpcvn
          | Some _resp ->
-             fprintf ff "let %s, %s = %s.get_new_rpc_id () in@," rpcvn jrpcvn modname;
+             fprintf ff "let %s, %s = %s.get_new_rpc_id () in@,"
+               rpcvn jrpcvn modname;
              fprintf ff "let %s = Some %s in@," jrpcvn jrpcvn
       );
       fprintf ff "@[<v 2>{ Jsonrpc.request_id = %s;@," jrpcvn;
-      fprintf ff "Jsonrpc.method_name = \"%s\";@," rpc.rpc_request.request_name;
-      fprintf ff "Jsonrpc.params = Json.Object (Array.of_list [ %s ])" args_str;
+      fprintf ff "Jsonrpc.method_name = \"%s\";@,"
+        rpc.rpc_request.request_name;
+      fprintf ff "Jsonrpc.params = Json.Object (Array.of_list [ %s ])"
+        args_str;
       (match rpc.rpc_response with
          | None -> fprintf ff "@]@,}@]"
          | Some resp -> fprintf ff "@]@,}, %s, %s@]@," rpcvn (gen_resp_name resp)
@@ -339,10 +379,12 @@ let generate_header ff =
   let argv = Array.to_list Sys.argv in
   let argv = (Filename.basename (List.hd argv)) :: (List.tl argv) in
   let call = String.concat " " argv in
-    fprintf ff "(* This file has been auto-generated using \"%s\". *)@\n@\n" call
+    fprintf ff "(* This file has been auto-generated using \"%s\". *)@\n@\n"
+      call
 
 let generate_opens ff spec =
-  List.iter (fun m -> fprintf ff "open %s@\n" (String.capitalize m)) (get_uses spec);
+  List.iter (fun m ->
+               fprintf ff "open %s@\n" (String.capitalize m)) (get_uses spec);
   fprintf ff "@\n"
 
 let open_output fn =

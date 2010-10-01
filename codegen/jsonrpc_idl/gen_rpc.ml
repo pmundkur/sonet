@@ -68,8 +68,9 @@ let parse_file f =
         | Json_parse.Json_value (v, consumed) ->
             rpc_decls := (!count, v) :: !rpc_decls;
             incr count;
-            input := String.sub !input consumed ((String.length !input) - consumed);
-            state := Json_parse.init_parse_state ()
+            let remaining = (String.length !input) - consumed in
+              input := String.sub !input consumed remaining;
+              state := Json_parse.init_parse_state ()
         | Json_parse.Json_parse_incomplete st ->
             input := "";
             state := st
@@ -123,7 +124,8 @@ let process_jdecl (i, j) =
     else if (Json_conv.is_object_field_present obj "endpoint_name") then
       try Rpc_decl.Rpc_endpoint (endpoint_of_json j)
       with Json_conv.Json_conv_error err ->
-	raise (Invalid_rpc_decl (i, "endpoint", (Json_conv.string_of_error err)))
+	raise (Invalid_rpc_decl (i, "endpoint",
+                                 (Json_conv.string_of_error err)))
     else
       raise (Unknown_rpc_decl (i, j))
 

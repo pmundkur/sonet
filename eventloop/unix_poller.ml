@@ -32,7 +32,7 @@ let add t fd =
 
 let remove t fd =
   let filter fd' = fd' <> fd
-  in 
+  in
     t.readers <- List.filter filter t.readers;
     t.writers <- List.filter filter t.writers;
     t.errors  <- List.filter filter t.errors
