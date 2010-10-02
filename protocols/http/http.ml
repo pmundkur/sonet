@@ -249,9 +249,10 @@ module Request_header = struct
     | Star
     | Uri of Uri.t
 
+  (* TODO: support proxy mode *)
   let string_of_url = function
     | Star  -> "*"
-    | Uri u -> Uri.to_string (Uri.normalize u)
+    | Uri u -> Uri.abspath_to_string (Uri.normalize u)
 
   type cursor =
     | Start
