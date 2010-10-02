@@ -17,6 +17,7 @@
 
 module H = Http
 module C = Http_client_conn
+module U = Unix
 
 type url = string
 type payload = string
@@ -131,12 +132,12 @@ let host_hdr uri =
     | None -> []
     | Some a -> [ ("Host", [a.Uri.host]) ]
 
-let reqhdr_of meth url =
+let reqhdr_of meth url hdrs =
   let u = Uri.of_string url in
     { H.Request_header.version = H.HTTP11;
       meth = meth;
       url = H.Request_header.Uri u;
-      headers = host_hdr u }
+      headers = (host_hdr u) @ hdrs }
 
 let payload_of = function
   | None -> None
@@ -151,7 +152,11 @@ let req_of reqhdr payload_opt =
     payload = payload_of payload_opt }
 
 let make_callback meth url results =
-  { c_meth = meth; c_url = url; c_response = None; c_error = None; c_results = results }
+  { c_meth = meth;
+    c_url = url;
+    c_response = None;
+    c_error = None;
+    c_results = results }
 
 let callbacks_with cb connect_callback =
   { Conn.connect_callback = connect_callback;
@@ -159,17 +164,27 @@ let callbacks_with cb connect_callback =
     shutdown_callback = shutdown_callback cb;
     error_callback = error_callback cb }
 
+let content_length_hdr_of_fd fd =
+  try [("Content-Length", [string_of_int (U.fstat fd).U.st_size])]
+  with _ -> []
+
+let content_length_hdr_of_payload = function
+  | None -> []
+  | Some s -> [("Content-Length", [string_of_int (String.length s)])]
+
 let make_file_recv_request meth url fd cb t =
   let prcb = file_receiver fd cb t in
-  C.StreamingRecv ((req_of (reqhdr_of meth url) None), prcb)
+  C.StreamingRecv ((req_of (reqhdr_of meth url []) None), prcb)
 
 let make_file_send_request meth url fd cb t =
   let pscb = file_sender fd (String.create 8048) cb t in
-    C.StreamingSend ((reqhdr_of meth url), pscb)
+  let cl_hdr = content_length_hdr_of_fd fd in
+    C.StreamingSend ((reqhdr_of meth url cl_hdr), pscb)
 
 let make_callbacks results meth = function
   | Payload (url, payload_opt) ->
-      let req = C.Small (req_of (reqhdr_of meth url) payload_opt) in
+      let cl_hdr = content_length_hdr_of_payload payload_opt in
+      let req = C.Small (req_of (reqhdr_of meth url cl_hdr) payload_opt) in
       let cb = make_callback meth url results in
         callbacks_with cb (Conn.send_request req cb)
   | FileRecv (url, fd) ->
