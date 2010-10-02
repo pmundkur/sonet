@@ -169,7 +169,7 @@ let content_length_hdr_of_fd fd =
   with _ -> []
 
 let content_length_hdr_of_payload = function
-  | None -> []
+  | None -> [("Content-Length", ["0"])]
   | Some s -> [("Content-Length", [string_of_int (String.length s)])]
 
 let make_file_recv_request meth url fd cb t =
