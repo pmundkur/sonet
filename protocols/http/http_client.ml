@@ -164,7 +164,7 @@ let make_file_recv_request meth url fd cb t =
   C.StreamingRecv ((req_of (reqhdr_of meth url) None), prcb)
 
 let make_file_send_request meth url fd cb t =
-  let pscb = file_sender fd (String.create 1024) cb t in
+  let pscb = file_sender fd (String.create 8048) cb t in
     C.StreamingSend ((reqhdr_of meth url), pscb)
 
 let make_callbacks results meth = function

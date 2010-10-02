@@ -120,7 +120,7 @@ let attach ev_loop fd  ?(enable_send_done=false) ?(enable_recv=true) callbacks =
                ev_fd = fd;
                callbacks = callbacks;
                send_done_enabled = enable_send_done;
-               send_buf = Buffer.create 16 }
+               send_buf = Buffer.create 8048 }
   in
     Conns.add_conn ev_handle conn;
     conn
