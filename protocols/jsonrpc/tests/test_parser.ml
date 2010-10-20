@@ -24,20 +24,23 @@ let parse_args () =
       | Some f -> f
       | None -> Arg.usage (Arg.align options) usage; exit 1
 
-let read_whole_file ic =
-  let buf = Buffer.create 512 in
-  let rec do_read () =
-    try
-      let line = input_line ic in
-        Buffer.add_string buf line;
-        do_read ()
-    with End_of_file ->
-      Buffer.contents buf
-  in do_read ()
+let read_whole_file input_file =
+  let st = Unix.stat input_file in
+  let buf = String.create st.Unix.st_size in
+  let fd = Unix.openfile input_file [ Unix.O_RDONLY ] 0 in
+  let rec do_read start len =
+    if len = 0 then ()
+    else
+      match Unix.read fd buf start len with
+        | 0 -> raise End_of_file
+        | read -> do_read (start + read) (len - read)
+  in
+    do_read 0 st.Unix.st_size;
+    Unix.close fd;
+    buf
 
 let parse_file f =
-  let ic = open_in f in
-  let input = ref (read_whole_file ic) in
+  let input = ref (read_whole_file f) in
   let state = ref (Json_parse.init_parse_state ()) in
     while String.length !input > 0 do
       match Json_parse.parse !state !input with

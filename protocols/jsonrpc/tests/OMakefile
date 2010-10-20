@@ -2,6 +2,9 @@ OCAMLINCLUDES[] += $(JSONRPC_LIB_DIR)
 
 OCAML_LIBS[] = $(JSONRPC_LIB_DIR)/jsonrpc
 
+OCAML_OTHER_LIBS[] +=
+        unix
+
 TEST_PARSER_PROG = test_parser
 TEST_PARSER = $(OCamlProgram $(TEST_PARSER_PROG), test_parser)
 
