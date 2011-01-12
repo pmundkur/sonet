@@ -39,4 +39,4 @@ type result = {
   error : error option;
 }
 
-val make_requests : (meth * request) list -> result list
+val request : (meth * request) list -> result list

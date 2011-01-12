@@ -47,8 +47,8 @@ let rec show_results = function
 let print_usage () =
   Printf.printf "%s: [options]\n" Sys.argv.(0);
   Printf.printf "    -get url : print the contents of the url\n";
-  Printf.printf "    -put url file : put the contents of the file at the url\n";
-  Printf.printf "    -push url file : push the contents of the file to the url\n";
+  Printf.printf "    -save url file : save the contents of the url to a file\n";
+  Printf.printf "    (-put|-post) url file : put the contents of the file at the url\n";
   exit 1
 
 let check_supported_url url =
@@ -95,13 +95,15 @@ let run () =
                   let file = get_arg opt (indx + 2) in
                     save_url url file;
                     process_args (indx + 3)
-            | _ ->
-                Printf.printf "Unrecognized option: %s\n" opt;
-                print_usage ()
+              | "-h" | "--help" ->
+                  print_usage ()
+              | _ ->
+                  Printf.printf "Unrecognized option: %s\n" opt;
+                  print_usage ()
          )
   in
     process_args 1;
-    let results = Client.make_requests !reqs
+    let results = Client.request !reqs
     in show_results results
 
 let _ =

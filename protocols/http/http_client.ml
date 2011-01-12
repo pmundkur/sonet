@@ -174,7 +174,7 @@ let content_length_hdr_of_payload = function
 
 let make_file_recv_request meth url fd cb t =
   let prcb = file_receiver fd cb t in
-  C.StreamingRecv ((req_of (reqhdr_of meth url []) None), prcb)
+    C.StreamingRecv ((req_of (reqhdr_of meth url []) None), prcb)
 
 let make_file_send_request meth url fd cb t =
   let pscb = file_sender fd (String.create 8048) cb t in
@@ -191,14 +191,14 @@ let make_callbacks results meth = function
       let cb = make_callback meth url results in
       let connect_callback =
         (fun t ->
-           Conn.send_request (make_file_recv_request meth url fd cb t) cb t) in
-        callbacks_with cb connect_callback
+           Conn.send_request (make_file_recv_request meth url fd cb t) cb t)
+      in callbacks_with cb connect_callback
   | FileSend (url, fd) ->
       let cb = make_callback meth url results in
       let connect_callback =
         (fun t ->
-           Conn.send_request (make_file_send_request meth url fd cb t) cb t) in
-        callbacks_with cb connect_callback
+           Conn.send_request (make_file_send_request meth url fd cb t) cb t)
+      in callbacks_with cb connect_callback
 
 let get_url = function
   | Payload (url, _) | FileRecv (url, _) | FileSend (url, _) -> url
@@ -235,7 +235,7 @@ let start_requests el requests =
     starter requests;
     results
 
-let make_requests reqs =
+let request reqs =
   let el = Eventloop.create () in
   let results_ref = start_requests el reqs in
     while Eventloop.has_connections el || Eventloop.has_timers el do
