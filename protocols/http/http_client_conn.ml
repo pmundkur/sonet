@@ -58,6 +58,8 @@ sig
   val connect : Eventloop.t -> Unix.sockaddr -> callbacks -> t
   val detach : t -> unit
   val close : t -> unit
+
+  val get_eventloop : t -> Eventloop.t
 end
 
 module C = Async_conn
@@ -299,6 +301,9 @@ module Make (Callback : CallbackType) = struct
     t.closed <- true;
     (try detach t with _ -> ());
     C.close t.conn
+
+  let get_eventloop t =
+    C.get_eventloop t.conn
 
   let string_of_error = function
     | Error_eventloop (e, f, s) ->

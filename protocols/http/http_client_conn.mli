@@ -56,6 +56,8 @@ sig
   val connect : Eventloop.t -> Unix.sockaddr -> callbacks -> t
   val detach : t -> unit
   val close : t -> unit
+
+  val get_eventloop : t -> Eventloop.t
 end
 
 module Make (Callback : CallbackType) : Conn with type callback = Callback.t
