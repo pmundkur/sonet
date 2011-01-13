@@ -20,23 +20,24 @@ type url = string
 type payload = string
 
 type request =
-  | Payload of url * payload option
-  | FileRecv of url * Unix.file_descr
-  | FileSend of url * Unix.file_descr
+  | Payload of url list * payload option
+  | FileRecv of url list * Unix.file_descr
+  | FileSend of url list * Unix.file_descr
 
 type error =
   | Unix of Unix.error
   | Other of string
 
+exception Invalid_request of request
 exception Invalid_url of url * string
 
 val is_supported_url : url -> bool
 
 type result = {
   meth : Http.Request_header.meth;
-  url : string;
+  url : url;
   response : Http.Response.t option;
-  error : error option;
+  error : (url * error) list option;
 }
 
 val request : (meth * request) list -> result list
