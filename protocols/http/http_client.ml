@@ -175,7 +175,7 @@ let fileofs_of_req =
 let reset_fileofs { c_req; c_fdofs } =
   match c_req with
     | Payload (_, _) -> ()
-    | FileRecv (_, fd) -> assert (Unix.lseek fd c_fdofs Unix.SEEK_SET = c_fdofs)
+    | FileRecv (_, fd) -> Unix.ftruncate fd c_fdofs
     | FileSend (_, fd) -> assert (Unix.lseek fd c_fdofs Unix.SEEK_SET = c_fdofs)
 
 let make_callback_arg c_meth c_req c_url c_alternates c_results =
@@ -207,12 +207,10 @@ let make_connect_callback meth cb_arg = function
       let req = C.Small (req_of reqhdr payload_opt) in
         Conn.send_request req cb_arg
   | FileRecv (_, fd) ->
-      Unix.ftruncate fd 0;
       (fun t ->
          let req = make_file_recv_request meth cb_arg.c_url fd cb_arg t in
            Conn.send_request req cb_arg t)
   | FileSend (_, fd) ->
-      assert ((Unix.lseek fd 0 Unix.SEEK_SET) = 0);
       (fun t ->
          let req = make_file_send_request meth cb_arg.c_url fd cb_arg t in
            Conn.send_request req cb_arg t)
