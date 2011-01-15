@@ -1,0 +1,2 @@
+<{test_http,test_uri}.{byte,native}>: use_unix, use_str
+<test_http_client.{byte,native}>: use_unix, use_str, use_eventloop

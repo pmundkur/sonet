@@ -8,4 +8,5 @@ OMakeroot.omc
 *.a
 *.opt
 *.annot
+*~
 

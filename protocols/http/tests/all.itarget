@@ -1,0 +1,6 @@
+test_http.byte
+test_http.native
+test_uri.byte
+test_uri.native
+test_http_client.byte
+test_http_client.native

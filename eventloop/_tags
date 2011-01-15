@@ -1,6 +1,1 @@
-<*.ml{i,}>: warn_A, warn_error_A, annot
 <eventloop.cm{x,}a>: use_libeventloop
-
-
-
-
