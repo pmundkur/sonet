@@ -497,7 +497,7 @@ let print_exception e =
 let generate defn_list ofn ifn =
   reset_known_types ();
   reset_converters ();
-  (try Unix.unlink ofn with _ -> ());
+  (try Sys.remove ofn with _ -> ());
   let op_flags = [ Open_wronly ; Open_creat; Open_trunc; Open_text ] in
   let oc = open_out_gen op_flags 0o444 ofn in
   let ff = formatter_of_out_channel oc in
@@ -515,4 +515,4 @@ let generate defn_list ofn ifn =
     with e ->
       Printf.eprintf "Error: %s\n" (print_exception e);
       close_out oc;
-      Unix.unlink ofn
+      Sys.remove ofn

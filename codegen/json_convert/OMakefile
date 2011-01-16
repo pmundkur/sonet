@@ -1,8 +1,6 @@
 GEN_FILES = parser.mli parser.ml lexer.ml
 OCamlGeneratedFiles($(GEN_FILES))
 
-OCAML_OTHER_LIBS[] += unix
-
 CONV_FILES[] =
 	lexer
 	parser
