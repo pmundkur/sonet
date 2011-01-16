@@ -23,6 +23,14 @@ let libodbus = "protocols/dbus/libodbus." ^ !Options.ext_lib;;
 
 dispatch begin function
   | After_rules ->
+      (* Set up include paths *)
+      Pathname.define_context "eventloop" ["eventloop"];
+      Pathname.define_context "protocols/http" ["eventloop"; "protocols/http"];
+      Pathname.define_context "protocols/http/tests" ["eventloop"; "protocols/http"];
+      Pathname.define_context "protocols/dbus" ["eventloop"];
+      Pathname.define_context "protocols/dbus/test" ["eventloop"; "protocols/dbus"];
+      Pathname.define_context "codegen/json_convert/tests" ["codegen/json_convert"];
+
       (* Handle the C stubs in eventloop *)
       flag ["link"; "library"; "ocaml"; "byte"; "use_libeventloop"]
         (S[A"-dllib"; A"-leventloop"; A"-cclib"; A"-leventloop"]);
@@ -49,11 +57,7 @@ dispatch begin function
         (S[A"-I"; P"protocols/dbus"; A"-cclib"; A"-lodbus"]);
       dep ["link"; "ocaml"; "use_dbuslib"] [libodbus];
 
-      (* Set up include paths *)
-      Pathname.define_context "eventloop" ["eventloop"];
-      Pathname.define_context "protocols/http" ["eventloop"; "protocols/http"];
-      Pathname.define_context "protocols/http/tests" ["eventloop"; "protocols/http"];
-      Pathname.define_context "protocols/dbus" ["eventloop"];
-      Pathname.define_context "protocols/dbus/test" ["eventloop"; "protocols/dbus"];
+      (* TODO: generated files in json_convert/tests and jsonrpc *)
+
   | _ -> ()
 end

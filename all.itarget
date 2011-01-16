@@ -4,3 +4,4 @@ protocols/http/tests/all.otarget
 protocols/jsonrpc/all.otarget
 protocols/dbus/all.otarget
 protocols/dbus/test/all.otarget
+codegen/json_convert/all.otarget
