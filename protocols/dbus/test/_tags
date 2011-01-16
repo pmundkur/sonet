@@ -1,0 +1,1 @@
+<{dbus,parse}_test.{byte,native}>: use_eventloop, use_unix, use_dbuslib
