@@ -1,5 +1,4 @@
 let system_sock_addr = "/var/run/dbus/system_bus_socket"
-let system_sock_addr = "/home/prashanth/src/dbus/install-1.3.0/var/run/dbus/system_bus_socket"
 let session_sock_addr = "\000/tmp/dbus-mzDgLTknAW"
 let dbus_addr = session_sock_addr
 
