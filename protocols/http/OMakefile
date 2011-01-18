@@ -9,7 +9,7 @@ FILES[] =
 	http_client_conn
 	http_client
 
-LIB = http
+LIB = httplib
 HTTP_LIB = $(OCamlLibrary $(LIB), $(FILES))
 
 .DEFAULT: $(HTTP_LIB)

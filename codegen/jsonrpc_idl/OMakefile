@@ -10,7 +10,7 @@ GEN_RPC_FILES[] =
 	codegen
 	gen_rpc
 
-OCAML_LIBS[] = $(JSONRPC_LIB_DIR)/jsonrpc
+OCAML_LIBS[] = $(JSONRPC_LIB_DIR)/jsonlib
 OCAML_OTHER_LIBS += unix
 
 GEN_RPC_PROG = gen_rpc

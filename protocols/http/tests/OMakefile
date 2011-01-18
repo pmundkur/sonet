@@ -1,6 +1,6 @@
 OCAMLINCLUDES[] += $(HTTP_LIB_DIR)
 
-OCAML_LIBS[] += $(HTTP_LIB_DIR)/http
+OCAML_LIBS[] += $(HTTP_LIB_DIR)/httplib
 
 OCAML_OTHER_LIBS[] +=
 	str

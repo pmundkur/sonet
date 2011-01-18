@@ -1,6 +1,6 @@
 OCAMLINCLUDES[] += $(JSONRPC_LIB_DIR)
 
-OCAML_LIBS[] = $(JSONRPC_LIB_DIR)/jsonrpc
+OCAML_LIBS[] = $(JSONRPC_LIB_DIR)/jsonlib
 
 OCAML_OTHER_LIBS[] +=
         unix

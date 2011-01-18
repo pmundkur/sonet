@@ -9,7 +9,7 @@ TESTER_FILES[] =
 	test_types_json_conv
 	test_json_conv
 
-OCAML_LIBS[] = $(JSONRPC_LIB_DIR)/jsonrpc
+OCAML_LIBS[] = $(JSONRPC_LIB_DIR)/jsonlib
 TESTER_PROG = test_json_conv
 TESTER = $(OCamlProgram $(TESTER_PROG), $(TESTER_FILES))
 

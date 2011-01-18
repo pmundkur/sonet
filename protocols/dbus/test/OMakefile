@@ -5,7 +5,7 @@ OCAMLINCLUDES[] += ..
 
 OCAML_LIBS[] +=
 	$(EVENTLOOP_DIR)/eventloop
-        ../dbus
+        ../dbuslib
 
 OCAML_OTHER_LIBS[] +=
 	unix

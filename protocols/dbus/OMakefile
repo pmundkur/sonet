@@ -19,7 +19,7 @@ DBUS_O_FILES[] =
 DBUS_C_FILES[] =
 	platform_stubs
 
-LIB = dbus
+LIB = dbuslib
 
 platform.$(CMO) platform.o : platform_stubs.o
 

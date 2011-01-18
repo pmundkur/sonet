@@ -4,7 +4,7 @@ FILES[] =
 	json_conv
 	jsonrpc
 
-LIB = jsonrpc
+LIB = jsonlib
 JSONRPC_LIB = $(OCamlLibrary $(LIB), $(FILES))
 
 .DEFAULT: $(JSONRPC_LIB)
