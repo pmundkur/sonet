@@ -36,4 +36,4 @@ DBUS_LIB = $(OCamlLibrary $(LIB), $(DBUS_O_FILES))
 clean:
 	$(CLEAN) $(DBUS_LIB)
 
-.SUBDIRS: test
+.SUBDIRS: tests

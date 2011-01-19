@@ -37,7 +37,7 @@ clean:
 	ocamlbuild -clean
 	make -C $(HTTP_DIR)/tests clean
 	make -C $(JSON_DIR)/tests clean
-	make -C $(DBUS_DIR)/test  clean
+	make -C $(DBUS_DIR)/tests  clean
 
 install: all
 	ocamlfind install $(LIB) META $(INSTALLS)
@@ -48,4 +48,4 @@ uninstall:
 install_test:
 	make -C $(HTTP_DIR)/tests
 	make -C $(JSON_DIR)/tests
-	make -C $(DBUS_DIR)/test
+	make -C $(DBUS_DIR)/tests
