@@ -11,8 +11,8 @@ DBUS_O_FILES[] =
 	dbus_msglib
 	dbus_conv
 	dbus_auth
-	protocol
-	platform
+	dbus_protocol
+	dbus_platform
 	utils
 	dbus_connection
 
@@ -21,7 +21,7 @@ DBUS_C_FILES[] =
 
 LIB = dbuslib
 
-platform.$(CMO) platform.o : platform_stubs.o
+dbus_platform.$(CMO) dbus_platform.o : platform_stubs.o
 
 platform_stubs.o: platform_stubs.c
 	$(OCAMLC) -c -o $@ $^

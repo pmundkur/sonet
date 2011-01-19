@@ -19,13 +19,13 @@ module T = Dbus_type
 module V = Dbus_value
 
 let platform_test () =
-  (match Platform.get_host_endianness () with
-     | Platform.Little_endian -> Printf.printf "Platform is little-endian.\n"
-     | Platform.Big_endian    -> Printf.printf "Platform is big-endian.\n");
+  (match Dbus_platform.get_host_endianness () with
+     | Dbus_platform.Little_endian -> Printf.printf "Platform is little-endian.\n"
+     | Dbus_platform.Big_endian    -> Printf.printf "Platform is big-endian.\n");
   let doubles = [3.0; 30003.3333] in
     List.iter (fun d ->
-                let da = Platform.float_to_bytes d in
-                let d' = Platform.float_of_bytes da in
+                let da = Dbus_platform.float_to_bytes d in
+                let d' = Dbus_platform.float_of_bytes da in
                   assert (d = d')
              ) doubles
 

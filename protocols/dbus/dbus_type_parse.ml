@@ -292,9 +292,9 @@ let parse_double ctxt =
   let align = T.alignment_of dtype in
   let ctxt = check_and_align_context ctxt ~align ~size:8 dtype in
   let db = Array.make 8 '\000' in
-    (match Platform.get_host_endianness (), ctxt.endian with
-       | Platform.Little_endian, T.Little_endian
-       | Platform.Big_endian, T.Big_endian ->
+    (match Dbus_platform.get_host_endianness (), ctxt.endian with
+       | Dbus_platform.Little_endian, T.Little_endian
+       | Dbus_platform.Big_endian, T.Big_endian ->
            db.(0) <- ctxt.buffer.[ctxt.offset];
            db.(1) <- ctxt.buffer.[ctxt.offset + 1];
            db.(2) <- ctxt.buffer.[ctxt.offset + 2];
@@ -313,7 +313,7 @@ let parse_double ctxt =
            db.(6) <- ctxt.buffer.[ctxt.offset + 1];
            db.(7) <- ctxt.buffer.[ctxt.offset]
     );
-    V.V_double (Platform.float_of_bytes db), advance ctxt 8
+    V.V_double (Dbus_platform.float_of_bytes db), advance ctxt 8
 
 let get_base_parser = function
   | T.B_byte ->         parse_byte

@@ -135,13 +135,13 @@ let init_context type_context msg_type payload_length flags protocol_version
 let parse_flags flags =
   let flags = Char.code flags in
   let with_no_reply flist =
-    if (flags land Protocol.no_reply_expected_flag
-        = Protocol.no_reply_expected_flag)
+    if (flags land Dbus_protocol.no_reply_expected_flag
+        = Dbus_protocol.no_reply_expected_flag)
     then M.Msg_flag_no_reply_expected :: flist
     else flist in
   let with_no_auto_start flist =
-    if (flags land Protocol.no_auto_start_flag
-        = Protocol.no_auto_start_flag)
+    if (flags land Dbus_protocol.no_auto_start_flag
+        = Dbus_protocol.no_auto_start_flag)
     then M.Msg_flag_no_auto_start :: flist
     else flist
   in
@@ -149,13 +149,13 @@ let parse_flags flags =
 
 let parse_msg_type mtype =
   let mtype = Char.code mtype in
-    if mtype = Protocol.method_call_msg
+    if mtype = Dbus_protocol.method_call_msg
     then M.Msg_type_method_call
-    else if mtype = Protocol.method_return_msg
+    else if mtype = Dbus_protocol.method_return_msg
     then M.Msg_type_method_return
-    else if mtype = Protocol.error_msg
+    else if mtype = Dbus_protocol.error_msg
     then M.Msg_type_error
-    else if mtype = Protocol.signal_msg
+    else if mtype = Dbus_protocol.signal_msg
     then M.Msg_type_signal
     else raise_error (Unknown_msg_type mtype)
 
@@ -267,8 +267,8 @@ let make_message ctxt =
 let process_fixed_header fh =
   let endian = fh.fixed_buffer.[0] in
   let endian =
-    if endian = Protocol.little_endian then T.Little_endian
-    else if endian = Protocol.big_endian then T.Big_endian
+    if endian = Dbus_protocol.little_endian then T.Little_endian
+    else if endian = Dbus_protocol.big_endian then T.Big_endian
     else raise_error Invalid_endian in
   let tctxt = (P.init_context endian fh.fixed_buffer
                  ~offset:1
@@ -313,7 +313,7 @@ let unpack_headers hdr_array =
                                         (hdr, ht, hdr_type))
                     else [ hdr, (hdr_type, hv) ]
                 with Not_found -> []
-             ) Protocol.all_headers
+             ) Dbus_protocol.all_headers
   in List.concat headers
 
 let process_headers ctxt =
@@ -322,7 +322,7 @@ let process_headers ctxt =
                  ~offset:0 ~length:(Buffer.length ctxt.buffer)) in
     (* At this point, the parsing context is where process_fixed_header
        left it, i.e. ready to parse the array. *)
-  let hdr_array, tctxt = P.parse_complete_type Protocol.hdr_array_type tctxt in
+  let hdr_array, tctxt = P.parse_complete_type Dbus_protocol.hdr_array_type tctxt in
   let headers = unpack_headers hdr_array in
     ctxt.headers <- headers;
     ctxt.type_context <- tctxt;

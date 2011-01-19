@@ -268,10 +268,10 @@ let marshal_double ctxt v =
   let dtype = T.T_base T.B_double in
   let align = T.alignment_of dtype in
   let ctxt = check_and_align_context ctxt ~align ~size:8 dtype in
-  let db = Platform.float_to_bytes (C.to_double v) in
-    (match Platform.get_host_endianness (), ctxt.endian with
-       | Platform.Little_endian, T.Little_endian
-       | Platform.Big_endian, T.Big_endian ->
+  let db = Dbus_platform.float_to_bytes (C.to_double v) in
+    (match Dbus_platform.get_host_endianness (), ctxt.endian with
+       | Dbus_platform.Little_endian, T.Little_endian
+       | Dbus_platform.Big_endian, T.Big_endian ->
            ctxt.buffer.[ctxt.current_offset] <- db.(0);
            ctxt.buffer.[ctxt.current_offset + 1] <- db.(1);
            ctxt.buffer.[ctxt.current_offset + 2] <- db.(2);

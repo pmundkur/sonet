@@ -24,7 +24,7 @@ JSON_INSTALLS = \
 DBUS_INSTALLS = \
 	$(DBUS_OBJ_DIR)/dbuslib.{a,cma,cmxa} \
 	$(DBUS_OBJ_DIR)/{dllodbus.so,libodbus.a} \
-	$(DBUS_OBJ_DIR)/*.{cmi,mli}
+	$(DBUS_OBJ_DIR)/dbus_*.{cmi,mli}
 
 INSTALLS = $(EVENTLOOP_INSTALLS) $(HTTP_INSTALLS) $(JSON_INSTALLS) $(DBUS_INSTALLS)
 

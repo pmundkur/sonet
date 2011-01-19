@@ -9,6 +9,6 @@ Dbus_type
 Dbus_type_marshal
 Dbus_type_parse
 Dbus_value
-Platform
-Protocol
+Dbus_platform
+Dbus_protocol
 Utils
