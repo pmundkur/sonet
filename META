@@ -1,0 +1,25 @@
+description = "Simple asynchronous networking in OCaml"
+version = "0.0.1"
+
+package "eventloop" (
+  requires = "unix"
+  archive(byte) = "eventloop.cma"
+  archive(native) = "eventloop.cmxa"
+)
+
+package "httplib" (
+  requires = "str,sonet.eventloop"
+  archive(byte) = "httplib.cma"
+  archive(native) = "httplib.cmxa"
+)
+
+package "jsonlib" (
+  archive(byte) = "jsonlib.cma"
+  archive(native) = "jsonlib.cmxa"
+)
+
+package "dbuslib" (
+  requires = "sonet.eventloop"
+  archive(byte) = "dbuslib.cma"
+  archive(native) = "dbuslib.cmxa"
+)
