@@ -22,6 +22,6 @@ messages in the RPC protocol.
 Building:
 ---------
 
-Sonet can be built using ocamlbuild (via make) or OMake.  The
-ocamlbuild does not currently build the JSON code-generators; the
-OMake is comprehensive.
+Sonet can be built using ocamlbuild (via make) or OMake.  The build
+using ocamlbuild does not currently build the JSON code-generators;
+the build using OMake is comprehensive.
