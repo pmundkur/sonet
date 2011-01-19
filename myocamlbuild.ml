@@ -49,13 +49,18 @@ dispatch begin function
         (S[A"-I"; P"eventloop"]);
 
       (* Handle the C stubs in dbus *)
+      flag ["link"; "library"; "ocaml"; "byte"; "use_libodbus"]
+        (S[A"-dllib"; A"-lodbus"; A"-cclib"; A"-lodbus"]);
+      flag ["link"; "library"; "ocaml"; "native"; "use_libodbus"]
+        (S[A"-cclib"; A"-lodbus"]);
+      dep ["link"; "ocaml"; "use_libodbus"] [libodbus];
+
+      (* Define the dbus library and its link behaviour *)
       ocaml_lib ~dir:"protocols/dbus" "protocols/dbus/dbuslib";
       flag ["link"; "ocaml"; "byte"; "use_dbuslib"]
-        (S[A"-custom"; A"-I"; P"protocols/dbus";
-           A"-dllib"; A"-lodbus"; A"-cclib"; A"-lodbus"]);
+        (S[A"-custom"; A"-I"; P"protocols/dbus"]);
       flag ["link"; "ocaml"; "native"; "use_dbuslib"]
-        (S[A"-I"; P"protocols/dbus"; A"-cclib"; A"-lodbus"]);
-      dep ["link"; "ocaml"; "use_dbuslib"] [libodbus];
+        (S[A"-I"; P"protocols/dbus"]);
 
       (* TODO: generated files in json_convert/tests and jsonrpc *)
 
