@@ -2,6 +2,7 @@
 OMakefile.omc
 OMakeroot.omc
 *.cmi
+*.cmo
 *.cmx
 *.cmxa
 *.o
