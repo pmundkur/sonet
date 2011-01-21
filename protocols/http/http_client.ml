@@ -125,7 +125,7 @@ let response_callback restarter cb t resp =
                 restart_after_error t (Other "HTTP redirect with empty location")
                   cb restarter
             | l :: _ ->
-                (* Redirect with logging an error *)
+                (* Redirect without logging an error *)
                 let new_cb = { cb with c_url = l } in
                 let el = Conn.get_eventloop t in
                   close_conn false cb t;
