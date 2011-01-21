@@ -30,7 +30,7 @@ type request =
 
 type error =
   | Unix of Unix.error
-  | Http of (* status code *) int
+  | Http of (* status code *) int * string
   | Other of string
 
 exception Invalid_request of request
@@ -122,7 +122,7 @@ let response_callback restarter cb t resp =
         try
           match Http.lookup_header "Location" headers with
             | [] ->
-                restart_after_error t (Other "HTTP redirect with empty location")
+                restart_after_error t (Http (status, "HTTP redirect with empty location"))
                   cb restarter
             | l :: _ ->
                 (* Redirect without logging an error *)
@@ -131,10 +131,10 @@ let response_callback restarter cb t resp =
                   close_conn false cb t;
                   restarter el new_cb
         with Not_found ->
-          restart_after_error t (Other "HTTP redirect with no location")
+          restart_after_error t (Http (status, "HTTP redirect with no location"))
             cb restarter
     end else
-      restart_after_error t (Http status) cb restarter
+      restart_after_error t (Http (status, "Unexpected response")) cb restarter
 
 let shutdown_callback restarter cb t =
   (* If we'd received a complete response, we would have received a
