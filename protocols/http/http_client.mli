@@ -26,6 +26,7 @@ type request =
 
 type error =
   | Unix of Unix.error
+  | Http of (* status code *) int
   | Other of string
 
 exception Invalid_request of request

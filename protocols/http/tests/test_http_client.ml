@@ -33,6 +33,7 @@ let string_of_req = function
 let errmsg (u, e) =
   let em = match e with
     | Client.Unix e -> Unix.error_message e
+    | Client.Http s -> Printf.sprintf "HTTP error response %d" s
     | Client.Other m -> m
   in Printf.printf "\t%s: %s\n" u em
 

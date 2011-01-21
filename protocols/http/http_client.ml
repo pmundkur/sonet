@@ -30,6 +30,7 @@ type request =
 
 type error =
   | Unix of Unix.error
+  | Http of (* status code *) int
   | Other of string
 
 exception Invalid_request of request
@@ -96,28 +97,57 @@ let file_sender fd buffer cb t () =
         close_conn true cb t;
         true, buffer, 0, 0
 
-let response_callback cb t resp =
+let restart_after_error t e cb restarter =
+  let c_error = Some ((cb.c_url, e) :: defopt [] cb.c_error) in
+    match cb with
+      | { c_alternates = [] } ->
+          cb.c_error <- c_error;
+          close_conn true cb t
+      | { c_alternates = c_url :: rest } ->
+          let new_cb = { cb with c_url; c_alternates = rest; c_error } in
+          let el = Conn.get_eventloop t in
+            close_conn false cb t;
+            restarter el new_cb
+
+let response_callback restarter cb t resp =
   assert (cb.c_response = None);
-  cb.c_response <- Some resp;
-  close_conn true cb t
+  let status = resp.Http.Response.response.Http.Response_header.status_code in
+    if status >= 200 && status < 299 then begin
+      cb.c_response <- Some resp;
+      close_conn true cb t
+    end else if status = 300 or status = 301 or status = 302 then begin
+      (* Perform redirection.  303 is not currently handled, and will
+         be treated like an error. *)
+      let headers = resp.Http.Response.response.Http.Response_header.headers in
+        try
+          match Http.lookup_header "Location" headers with
+            | [] ->
+                restart_after_error t (Other "HTTP redirect with empty location")
+                  cb restarter
+            | l :: _ ->
+                (* Redirect with logging an error *)
+                let new_cb = { cb with c_url = l } in
+                let el = Conn.get_eventloop t in
+                  close_conn false cb t;
+                  restarter el new_cb
+        with Not_found ->
+          restart_after_error t (Other "HTTP redirect with no location")
+            cb restarter
+    end else
+      restart_after_error t (Http status) cb restarter
 
-let shutdown_callback cb t =
-  close_conn true cb t
+let shutdown_callback restarter cb t =
+  (* If we'd received a complete response, we would have received a
+     response_callback by now, so getting this callback is equivalent
+     to an error callback.  *)
+  assert (cb.c_response = None);
+  restart_after_error t (Other "connection shutdown") cb restarter
 
-let error_callback cb restarter t e =
+let error_callback restarter cb t e =
   let err = (match e with
                | Conn.Error_eventloop (e, _, _) -> Unix e
                | Conn.Error_http (_, m) -> Other m) in
-  let c_error = Some ((cb.c_url, err) :: defopt [] cb.c_error) in
-  match cb with
-    | { c_alternates = [] } ->
-        cb.c_error <- c_error;
-        close_conn true cb t
-    | { c_alternates = c_url :: rest } ->
-        let new_cb = { cb with c_url; c_alternates = rest; c_error } in
-        let el = Conn.get_eventloop t in
-          close_conn false cb t;
-          restarter el new_cb
+    restart_after_error t err cb restarter
 
 let scheme_host_port url =
   let uri = Uri.of_string url in
@@ -217,30 +247,31 @@ let make_connect_callback meth cb_arg = function
 
 let rec make_conn el cb_funcs
     ({ c_url = url; c_alternates; c_error } as cb_arg) =
-      let scheme, h, p = scheme_host_port url in
-      let port = defopt 80 p in
-      let err = (match addr_of_host h scheme with
-                   | None ->
-                       Some (Other ("Unable to resolve " ^ h))
-                   | Some a ->
-                       let addr = Unix.ADDR_INET (a, port) in
-                       ignore (Conn.connect el addr cb_funcs);
-                       None) in
-        match err, c_alternates with
-          | None, _ ->
-              None
-          | Some e, [] ->
-              let error = Some ((url, e) :: defopt [] c_error) in
-                Some { meth = cb_arg.c_meth; url; response = None; error }
-          | Some e, c_url :: c_alternates ->
-              let c_error = Some ((url, e) :: (defopt [] c_error)) in
-              make_conn el cb_funcs { cb_arg with c_url; c_alternates; c_error }
+  let scheme, h, p = scheme_host_port url in
+  let port = defopt 80 p in
+  let err = (match addr_of_host h scheme with
+               | None ->
+                   Some (Other ("Unable to resolve " ^ h))
+               | Some a ->
+                   let addr = Unix.ADDR_INET (a, port) in
+                     ignore (Conn.connect el addr cb_funcs);
+                     None) in
+    match err, c_alternates with
+      | None, _ ->
+          None
+      | Some e, [] ->
+          let error = Some ((url, e) :: defopt [] c_error) in
+            Some { meth = cb_arg.c_meth; url; response = None; error }
+      | Some e, c_url :: c_alternates ->
+          let c_error = Some ((url, e) :: (defopt [] c_error)) in
+            make_conn el cb_funcs { cb_arg with c_url; c_alternates; c_error }
 
 let callbacks_with cb_arg connect_callback get_restarter =
-  { Conn.connect_callback = connect_callback;
-    response_callback = response_callback;
-    shutdown_callback = shutdown_callback cb_arg;
-    error_callback = error_callback cb_arg (get_restarter ()) }
+  let restarter = get_restarter () in
+    { Conn.connect_callback = connect_callback;
+      response_callback = response_callback restarter;
+      shutdown_callback = shutdown_callback restarter cb_arg;
+      error_callback = error_callback restarter cb_arg }
 
 let rec get_restarter () =
   (fun el cb_arg ->
