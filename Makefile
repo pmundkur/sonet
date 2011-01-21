@@ -28,7 +28,7 @@ DBUS_INSTALLS = \
 
 INSTALLS = $(EVENTLOOP_INSTALLS) $(HTTP_INSTALLS) $(JSON_INSTALLS) $(DBUS_INSTALLS)
 
-.PHONY: all clean install
+.PHONY: all clean install uninstall install_test
 
 all:
 	ocamlbuild all.otarget
