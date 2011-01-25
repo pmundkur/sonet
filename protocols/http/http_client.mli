@@ -29,6 +29,8 @@ type error =
   | Http of (* status code *) int * string
   | Other of string
 
+val string_of_error : error -> string
+
 exception Invalid_request of request
 exception Invalid_url of url * string
 

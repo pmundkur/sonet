@@ -33,6 +33,11 @@ type error =
   | Http of (* status code *) int * string
   | Other of string
 
+let string_of_error = function
+  | Unix e -> Unix.error_message e
+  | Http (sc, m) -> Printf.sprintf "HTTP status %d: %s" sc m
+  | Other m -> m
+
 exception Invalid_request of request
 exception Invalid_url of url * string
 
