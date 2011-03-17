@@ -170,7 +170,7 @@ let addr_of_host h scheme =
     | { Unix.ai_addr = Unix.ADDR_INET (a, _) } :: _ -> Some a
     | _ :: rest -> get_suitable rest
   in
-    get_suitable (Unix.getaddrinfo h scheme
+    get_suitable (Unix.getaddrinfo h ""
                     [ Unix.AI_FAMILY Unix.PF_INET;
                       Unix.AI_SOCKTYPE Unix.SOCK_STREAM ])
 
