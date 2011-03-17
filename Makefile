@@ -28,7 +28,7 @@ DBUS_INSTALLS = \
 
 INSTALLS = $(EVENTLOOP_INSTALLS) $(HTTP_INSTALLS) $(JSON_INSTALLS) $(DBUS_INSTALLS)
 
-.PHONY: all clean install uninstall install_test
+.PHONY: all clean install uninstall reinstall install_test
 
 all:
 	ocamlbuild all.otarget
@@ -44,6 +44,8 @@ install: all
 
 uninstall:
 	ocamlfind remove $(LIB)
+
+reinstall: uninstall install
 
 install_test:
 	make -C $(HTTP_DIR)/tests
