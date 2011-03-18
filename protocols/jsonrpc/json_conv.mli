@@ -25,20 +25,20 @@ exception Json_conv_error of error
 
 
 (* conversion routines for base types *)
-val string_of_json: ?permissive:bool -> Json.t -> string
-val string_to_json: string -> Json.t
+val to_string: ?permissive:bool -> Json.t -> string
+val of_string: string -> Json.t
 
-val int_of_json: ?permissive:bool -> Json.t -> int
-val int_to_json: int -> Json.t
+val to_int: ?permissive:bool -> Json.t -> int
+val of_int: int -> Json.t
 
-val int64_of_json: ?permissive:bool -> Json.t -> int64
-val int64_to_json: int64 -> Json.t
+val to_int64: ?permissive:bool -> Json.t -> int64
+val of_int64: int64 -> Json.t
 
-val float_of_json: ?permissive:bool -> Json.t -> float
-val float_to_json: float -> Json.t
+val to_float: ?permissive:bool -> Json.t -> float
+val of_float: float -> Json.t
 
-val bool_of_json: ?permissive:bool -> Json.t -> bool
-val bool_to_json: bool -> Json.t
+val to_bool: ?permissive:bool -> Json.t -> bool
+val of_bool: bool -> Json.t
 
 (* utilities used by generated code *)
 val raise_unexpected_json_type: string -> string -> 'a
@@ -46,12 +46,12 @@ val raise_short_array: int -> int -> 'a
 val raise_unknown_constructor: string -> string -> 'a
 val check_array_with_length: 'a array -> int -> unit
 val get_variant_constructor: Json.t -> string * Json.t array
-val get_array: Json.t -> Json.t array
-val get_array_elem: Json.t array -> int -> Json.t
-val get_list: Json.t -> Json.t list
+val to_array: Json.t -> Json.t array
+val array_elem: Json.t array -> int -> Json.t
+val to_list: Json.t -> Json.t list
 
 type object_table
-val get_object_table: Json.t -> object_table
-val get_object_field: object_table -> string -> Json.t
-val get_optional_object_field: object_table -> string -> Json.t
-val is_object_field_present: object_table -> string -> bool
+val to_object_table: Json.t -> object_table
+val object_field: object_table -> string -> Json.t
+val optional_object_field: object_table -> string -> Json.t
+val has_object_field: object_table -> string -> bool

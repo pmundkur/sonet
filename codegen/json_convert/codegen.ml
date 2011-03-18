@@ -33,11 +33,11 @@ let find_converter ident =
 let reset_converters () = converters := []
 
 let base_to_str = function
-  | B_string -> "Json_conv.string"
-  | B_int -> "Json_conv.int"
-  | B_int64 -> "Json_conv.int64"
-  | B_float -> "Json_conv.float"
-  | B_bool -> "Json_conv.bool"
+  | B_string -> "string"
+  | B_int -> "int"
+  | B_int64 -> "int64"
+  | B_float -> "float"
+  | B_bool -> "bool"
   | B_ident s -> find_converter s
 
 type var = { stem: string; mark: int }
@@ -210,7 +210,7 @@ module To = struct
   let to_array_str ?(constr="") vlist =
     let elems = List.map name_of_var vlist in
     let constr = (if constr = "" then ""
-                  else "(Json_conv.string_to_json \"" ^ constr ^ "\"); ") in
+                  else "(of_string \"" ^ constr ^ "\"); ") in
       "[| " ^ constr ^ (String.concat "; " elems) ^ " |]"
 
   let to_object_str ?(is_record=false) fn_list fv_list =
@@ -236,7 +236,7 @@ module To = struct
                | B_ident ident -> (if not (is_known_type ident)
                                    then raise (Unknown_base_type ident))
                | _ -> ());
-            fprintf ff "%s_to_json %s" (base_to_str bt) v
+            fprintf ff "of_%s %s" (base_to_str bt) v
         | C_option optt ->
             let optv, venv = Var_env.new_ident_from_type venv optt in
               fprintf ff "(match %s with@," v;
@@ -342,7 +342,7 @@ module From = struct
                | B_ident ident -> (if not (is_known_type ident)
                                    then raise (Unknown_base_type ident))
                | _ -> ());
-            fprintf ff "%s_of_json %s" (base_to_str bt) v
+            fprintf ff "to_%s %s" (base_to_str bt) v
         | C_option optt ->
             let optv, venv = Var_env.new_ident_from_type venv optt in
               fprintf ff "(match %s with@," v;
@@ -358,7 +358,7 @@ module From = struct
               fprintf ff "@[<v 8>let %s = Array.map@," oarrayvn;
               fprintf ff "@[<v 8>(fun %s ->@," (name_of_var elemv);
               of_json ff venv elemv elemt tname;
-              fprintf ff "@]@,) (Json_conv.get_array %s) in@]@," v;
+              fprintf ff "@]@,) (to_array %s) in@]@," v;
               fprintf ff "Array.to_list %s" oarrayvn
         | C_array elemt ->
             let elemv, venv = Var_env.new_ident_from_type venv elemt in
@@ -368,15 +368,15 @@ module From = struct
               fprintf ff "@[<v 8>let %s = Array.map@," oarrayvn;
               fprintf ff "@[<v 8>(fun %s ->@," (name_of_var elemv);
               of_json ff venv elemv elemt tname;
-              fprintf ff "@]@,) (Json_conv.get_array %s) in@]@," v;
+              fprintf ff "@]@,) (to_array %s) in@]@," v;
               fprintf ff "%s" oarrayvn
         | C_tuple ctlist ->
             let jarrayv, venv =
               Var_env.new_ident_from_name venv v ~suffix:"_jarray" in
             let jarrayvn = name_of_var jarrayv in
             let letvlist, venv = Var_env.new_idents_from_types venv ctlist in
-              fprintf ff "let %s = Json_conv.get_array %s in@," jarrayvn v;
-              fprintf ff "Json_conv.check_array_with_length %s %d;@,"
+              fprintf ff "let %s = to_array %s in@," jarrayvn v;
+              fprintf ff "check_array_with_length %s %d;@,"
                 jarrayvn (List.length ctlist);
               ignore (List.fold_left
                         (fun indx (letv, ct) ->
@@ -394,7 +394,7 @@ module From = struct
             let objtv, venv =
               Var_env.new_ident_from_name venv v ~suffix:"_ftable" in
             let objtvn = name_of_var objtv in
-              fprintf ff "let %s = Json_conv.get_object_table %s in@,"
+              fprintf ff "let %s = to_object_table %s in@,"
                 objtvn v;
               List.iter2 (fun letv (fn, ft) ->
                             let fvar, venv =
@@ -404,7 +404,7 @@ module From = struct
                                   | C_option _ -> "optional_"
                                   | _ -> ""
                             in
-                              fprintf ff "let %s = Json_conv.get_%sobject_field %s \"%s\" in@,"
+                              fprintf ff "let %s = %sobject_field %s \"%s\" in@,"
                                 (name_of_var fvar) optional objtvn
                                 (Pragma.json_field_name fn);
                               let_bind ff venv letv fvar ft tname
@@ -416,12 +416,12 @@ module From = struct
             let argsv, venv = Var_env.new_ident_from_name venv "args" in
             let defmatchv, venv = Var_env.new_ident_from_name venv "s" in
             let defmatchvn = name_of_var defmatchv in
-              fprintf ff "let %s, %s = Json_conv.get_variant_constructor %s in@,"
+              fprintf ff "let %s, %s = get_variant_constructor %s in@,"
                 consvn (name_of_var argsv) v;
               fprintf ff "(match %s with@," consvn;
               List.iter (fun cd -> variant ff venv argsv cd tname) cdlist;
               (* need to write a default match case *)
-              fprintf ff "| %s -> Json_conv.raise_unknown_constructor \"%s\" %s@,)"
+              fprintf ff "| %s -> raise_unknown_constructor \"%s\" %s@,)"
                 defmatchvn tname defmatchvn
 
   and variant ff venv argsv (CD_tuple (vname, vtlist)) tname =
@@ -432,7 +432,7 @@ module From = struct
       Var_env.new_idents_from_vars venv ~prefix:"o_" vlist in
       fprintf ff "@[<v 8>| \"%s\" ->@," vname;
       if vtlen > 0 then
-        fprintf ff "Json_conv.check_array_with_length %s %d;@,"
+        fprintf ff "check_array_with_length %s %d;@,"
           argsvn (vtlen + 1);
       ignore (List.fold_left (fun indx (letv, vt) ->
                                 let inv, venv =
@@ -460,10 +460,10 @@ module From = struct
 end
 
 let generate_to_def ff is_and (tname, trep) =
-  To.def ff Var_env.new_env (tname ^ "_to_json") trep is_and
+  To.def ff Var_env.new_env ("of_" ^ tname) trep is_and
 
 let generate_from_def ff is_and (tname, trep) =
-  From.def ff Var_env.new_env (tname ^ "_of_json") (tname, trep) is_and
+  From.def ff Var_env.new_env ("to_" ^ tname) (tname, trep) is_and
 
 let generate_header ff ifn =
   let md = Filename.basename (Filename.chop_extension ifn) in
@@ -471,7 +471,7 @@ let generate_header ff ifn =
   let argv = (Filename.basename (List.hd argv)) :: (List.tl argv) in
   let call = String.concat " " argv in
     fprintf ff "(* This file has been auto-generated using \"%s\". *)@\n@\n" call;
-    fprintf ff "open %s@\n@\n" (String.capitalize md)
+    fprintf ff "open Json_conv\nopen %s@\n@\n" (String.capitalize md)
 
 let generate_one_defn ff td =
   match td with

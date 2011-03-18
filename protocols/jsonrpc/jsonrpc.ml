@@ -69,11 +69,11 @@ type rpc_response = {
 
 let request_of_json j =
   try
-    let obj = get_object_table j in
-    let id = get_optional_object_field obj "id" in
+    let obj = to_object_table j in
+    let id = optional_object_field obj "id" in
     let id = if id = Json.Null then None else Some id in
-    let method_name = string_of_json (get_object_field obj "method") in
-    let params = get_object_field obj "params" in
+    let method_name = to_string (object_field obj "method") in
+    let params = object_field obj "params" in
       if not (Json.is_object params) && not (Json.is_array params) then
         raise (Invalid_request Request_invalid_params);
       { request_id = id; method_name = method_name; params = params }
@@ -82,8 +82,8 @@ let request_of_json j =
 let request_of_string s = request_of_json (Json_parse.of_string s)
 
 let request_to_json req =
-  let fields = (("jsonrpc", string_to_json "2.0")
-                :: ("method", string_to_json req.method_name)
+  let fields = (("jsonrpc", of_string "2.0")
+                :: ("method", of_string req.method_name)
                 :: ("params", req.params)
                 :: (match req.request_id with
                       | None -> []
@@ -100,17 +100,17 @@ let response_make_success id data =
 
 let response_of_json j =
   let error_of_json j =
-    let obj = get_object_table j in
-    let code = int_of_json (get_object_field obj "code") in
-    let message = string_of_json (get_object_field obj "message") in
-    let data = get_optional_object_field obj "data" in
+    let obj = to_object_table j in
+    let code = to_int (object_field obj "code") in
+    let message = to_string (object_field obj "message") in
+    let data = optional_object_field obj "data" in
       code, message, (match data with Json.Null -> None | j -> Some j)
   in
     try
-      let obj = get_object_table j in
-      let id = get_object_field obj "id" in
-      let result = get_optional_object_field obj "result" in
-      let error =  get_optional_object_field obj "error" in
+      let obj = to_object_table j in
+      let id = object_field obj "id" in
+      let result = optional_object_field obj "result" in
+      let error =  optional_object_field obj "error" in
         match result, error with
           | _, Json.Null ->
               response_make_success id result
@@ -125,16 +125,16 @@ let response_of_string s = response_of_json (Json_parse.of_string s)
 
 let response_to_json resp =
   let result_to_json id result =
-    Json.Object [| ("jsonrpc", string_to_json "2.0");
+    Json.Object [| ("jsonrpc", of_string "2.0");
                    ("id", id);
                    ("result", result)
                 |]
   in
   let error_to_json id (c, m, d) =
-    let err = (("code", int_to_json c)
-               :: ("message", string_to_json m)
+    let err = (("code", of_int c)
+               :: ("message", of_string m)
                :: (match d with None -> [] | Some d -> [ ("data", d) ])) in
-      Json.Object [| ("jsonrpc", string_to_json "2.0");
+      Json.Object [| ("jsonrpc", of_string "2.0");
                      ("id", id);
                      ("error", Json.Object (Array.of_list err))
                   |]

@@ -22,13 +22,9 @@ module Type_conv = struct
     | "string" | "int" | "int64" | "float" | "bool" -> true
     | _ -> false
 
-  let to_json t =
-    if is_base_type t then Printf.sprintf "Json_conv.%s_to_json" t
-    else t ^ "_to_json"
+  let to_json t = "of_" ^ t
 
-  let of_json t =
-    if is_base_type t then Printf.sprintf "Json_conv.%s_of_json" t
-    else t ^ "_of_json"
+  let of_json t = "to_" ^ t
 end
 
 
@@ -144,7 +140,7 @@ module Server = struct
 
   let gen_param ff venv otvn _i p =
     let arg, venv = Var_env.new_ident_from_name venv p.param_name in
-      fprintf ff "let %s = %s (Json_conv.get_object_field %s \"%s\") in@,"
+      fprintf ff "let %s = %s (Json_conv.object_field %s \"%s\") in@,"
         (name_of_var arg) (Type_conv.of_json p.param_type) otvn p.param_name;
       arg, venv
 
@@ -159,7 +155,7 @@ module Server = struct
            | [] ->
                "()", venv
            | _  ->
-               fprintf ff "let %s = Json_conv.get_object_table %s.Jsonrpc.params in@,"
+               fprintf ff "let %s = Json_conv.to_object_table %s.Jsonrpc.params in@,"
                  otvn reqvn;
                let paramsv, venv, _ =
                  List.fold_left (fun (alist, venv, i) p ->
@@ -190,7 +186,7 @@ module Server = struct
            | [] ->
                "()", venv
            | _  ->
-               fprintf ff "let %s = Json_conv.get_object_table %s.Jsonrpc.params in@,"
+               fprintf ff "let %s = Json_conv.to_object_table %s.Jsonrpc.params in@,"
                  otvn reqvn;
                let paramsv, venv, _ =
                  List.fold_left (fun (alist, venv, i) p ->

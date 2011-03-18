@@ -43,7 +43,7 @@ let check_base_type () =
              B_string "test";
              B_float 0.1
            ] in
-    test_list base_type_to_json base_type_of_json bs
+    test_list of_base_type to_base_type bs
 
 let check_simple_type () =
   let ss = [ S_int_option None;
@@ -65,7 +65,7 @@ let check_simple_type () =
              S_int64_array [| 1L; 3L; -2L; 5L |];
              S_string_array [| "iggy"; "franti"; "zappa" |]
            ] in
-    test_list simple_type_to_json simple_type_of_json ss
+    test_list of_simple_type to_simple_type ss
 
 let check_record_type () =
   let rs = [ { record_int = 32;
@@ -79,14 +79,14 @@ let check_record_type () =
 
                record_prod_list = [ (1,false); (-23, true); (-1000, true) ], "prod"
              } ] in
-    test_list record_type_to_json record_type_of_json rs
+    test_list of_record_type to_record_type rs
 
 let check_complex_type1 () =
   let cs = [ [| |];
              [| ([], true) |];
              [| ([4; 3; 1], false); ([1; 3; 4], true) |];
            ] in
-    test_list complex_type1_to_json complex_type1_of_json cs
+    test_list of_complex_type1 to_complex_type1 cs
 
 let check_complex_type2 () =
   let cs = [ { record = { record_int = 32;
@@ -103,11 +103,11 @@ let check_complex_type2 () =
                complex_type1 = [| ([4; 3; 1], false); ([1; 3; 4], true) |];
              }
            ] in
-    test_list complex_type2_to_json complex_type2_of_json cs
+    test_list of_complex_type2 to_complex_type2 cs
 
 let check_open_and_conv () =
   let cs = [ 1L; -1L ] in
-    test_list t_to_json t_of_json cs
+    test_list of_t to_t cs
 
 let parse_args () =
   let options = [("-print-value", Arg.Set do_print, " print output")] in

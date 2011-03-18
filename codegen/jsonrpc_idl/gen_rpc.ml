@@ -108,21 +108,21 @@ let print_exception e =
 let process_jdecl (i, j) =
   if not (Json.is_object j) then
     raise (Unknown_rpc_decl (i, j));
-  let obj = Json_conv.get_object_table j in
-    if (Json_conv.is_object_field_present obj "use_modules") then
-      try Rpc_decl.Rpc_use (use_of_json j)
+  let obj = Json_conv.to_object_table j in
+    if (Json_conv.has_object_field obj "use_modules") then
+      try Rpc_decl.Rpc_use (to_use j)
       with Json_conv.Json_conv_error err ->
 	raise (Invalid_rpc_decl (i, "use", (Json_conv.string_of_error err)))
-    else if (Json_conv.is_object_field_present obj "server_name") then
-      try Rpc_decl.Rpc_server (server_of_json j)
+    else if (Json_conv.has_object_field obj "server_name") then
+      try Rpc_decl.Rpc_server (to_server j)
       with Json_conv.Json_conv_error err ->
 	raise (Invalid_rpc_decl (i, "server", (Json_conv.string_of_error err)))
-    else if (Json_conv.is_object_field_present obj "rpc_type") then
-      try Rpc_decl.Rpc_rpc (rpc_of_json j)
+    else if (Json_conv.has_object_field obj "rpc_type") then
+      try Rpc_decl.Rpc_rpc (to_rpc j)
       with Json_conv.Json_conv_error err ->
 	raise (Invalid_rpc_decl (i, "rpc", (Json_conv.string_of_error err)))
-    else if (Json_conv.is_object_field_present obj "endpoint_name") then
-      try Rpc_decl.Rpc_endpoint (endpoint_of_json j)
+    else if (Json_conv.has_object_field obj "endpoint_name") then
+      try Rpc_decl.Rpc_endpoint (to_endpoint j)
       with Json_conv.Json_conv_error err ->
 	raise (Invalid_rpc_decl (i, "endpoint",
                                  (Json_conv.string_of_error err)))

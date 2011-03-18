@@ -185,7 +185,7 @@ let test_server () =
     let exp_resp = S.req0_handler () () in
     let resp_to_str r = match r with |None -> "None" | Some b -> if b then "Some true" else "Some false" in
     let resp_checker r =
-      let got_resp = resp1_type_of_json r in
+      let got_resp = to_resp1_type r in
         if got_resp <> exp_resp
         then raise (Failure (Printf.sprintf "req1, test %s: got \"%s\", expected \"%s\"!"
                                test_id (resp_to_str got_resp) (resp_to_str exp_resp)));
@@ -200,7 +200,7 @@ let test_server () =
     let exp_resp = S.req1_handler arg1 () in
     let resp_to_str r = match r with |None -> "None" | Some b -> if b then "Some true" else "Some false" in
     let resp_checker r =
-      let got_resp = resp1_type_of_json r in
+      let got_resp = to_resp1_type r in
         if got_resp <> exp_resp
         then raise (Failure (Printf.sprintf "req1, test %s: got \"%s\", expected \"%s\"!"
                                test_id (resp_to_str got_resp) (resp_to_str exp_resp)));
@@ -213,7 +213,7 @@ let test_server () =
     let req, _rpcid, resp_fn = C.jrpc_request2 arg1 arg2 arg3 in
     let exp_resp = S.req2_handler arg1 arg2 arg3 () in
     let resp_checker r =
-      let got_resp = resp2_type_of_json r in
+      let got_resp = to_resp2_type r in
         if got_resp <> exp_resp
         then raise (Failure (Printf.sprintf "req2, test %s: got \"%s\", expected \"%s\"!" test_id got_resp exp_resp));
         resp_fn r (I.Req2 exp_resp)

@@ -43,7 +43,7 @@ let raise_unknown_constructor typ cons =
 let raise_missing_object_field field =
   raise (Json_conv_error (Missing_object_field field))
 
-let string_of_json ?(permissive=false) j =
+let to_string ?(permissive=false) j =
   let strict = function
     | Json.String s -> s
     | _             -> raise_unexpected_json_type (Json.string_of_type j) "string" in
@@ -58,10 +58,9 @@ let string_of_json ?(permissive=false) j =
     | _             -> raise_unexpected_json_type (Json.string_of_type j) "string" in
     if not permissive then strict j else lenient j
 
-let string_to_json s = Json.String s
+let of_string s = Json.String s
 
-
-let int_of_json ?(permissive=false) j =
+let to_int ?(permissive=false) j =
   let strict = function
     | Json.Int i    -> Int64.to_int i
     | _             -> raise_unexpected_json_type (Json.string_of_type j) "int" in
@@ -78,10 +77,9 @@ let int_of_json ?(permissive=false) j =
     | _             -> raise_unexpected_json_type (Json.string_of_type j) "int" in
     if not permissive then strict j else lenient j
 
-let int_to_json i = Json.Int (Int64.of_int i)
+let of_int i = Json.Int (Int64.of_int i)
 
-
-let int64_of_json ?(permissive=false) j =
+let to_int64 ?(permissive=false) j =
   let strict = function
     | Json.Int i    -> i
     | _             -> raise_unexpected_json_type (Json.string_of_type j) "int64" in
@@ -98,9 +96,9 @@ let int64_of_json ?(permissive=false) j =
     | _             -> raise_unexpected_json_type (Json.string_of_type j) "int64" in
     if not permissive then strict j else lenient j
 
-let int64_to_json i = Json.Int i
+let of_int64 i = Json.Int i
 
-let float_of_json ?(permissive=false) j =
+let to_float ?(permissive=false) j =
   let strict = function
     | Json.Float f  -> f
     | _             -> raise_unexpected_json_type (Json.string_of_type j) "float" in
@@ -117,9 +115,9 @@ let float_of_json ?(permissive=false) j =
     | _             -> raise_unexpected_json_type (Json.string_of_type j) "float" in
     if not permissive then strict j else lenient j
 
-let float_to_json f = Json.Float f
+let of_float f = Json.Float f
 
-let bool_of_json  ?(permissive=false) j =
+let to_bool  ?(permissive=false) j =
   let strict = function
     | Json.Bool b   -> b
     | _             -> raise_unexpected_json_type (Json.string_of_type j) "bool" in
@@ -136,7 +134,7 @@ let bool_of_json  ?(permissive=false) j =
     | _             -> raise_unexpected_json_type (Json.string_of_type j) "bool" in
     if not permissive then strict j else lenient j
 
-let bool_to_json b = Json.Bool b
+let of_bool b = Json.Bool b
 
 
 (* utilities *)
@@ -155,37 +153,37 @@ let get_variant_constructor j =
           else if not (Json.is_string arr.(0)) then
             raise_unexpected_json_type (Json.string_of_type j) "string"
           else
-            (string_of_json arr.(0)), arr
+            (to_string arr.(0)), arr
     | _ ->
         raise_unexpected_json_type (Json.string_of_type j) "array"
 
-let get_array j =
+let to_array j =
   match j with
     | Json.Array arr -> arr
     | _ -> raise_unexpected_json_type (Json.string_of_type j) "array"
 
-let get_array_elem arr i =
+let array_elem arr i =
   check_array_with_length arr (i + 1);
   arr.(i)
 
-let get_list j =
-  Array.to_list (get_array j)
+let to_list j =
+  Array.to_list (to_array j)
 
 type object_table = (string * Json.t) list
 
-let get_object_table j =
+let to_object_table j =
   match j with
     | Json.Object a -> Array.to_list a
     | _ -> raise_unexpected_json_type (Json.string_of_type j) "object"
 
-let get_object_field t f =
+let object_field t f =
   try List.assoc f t
   with Not_found -> raise_missing_object_field f
 
-let get_optional_object_field t f =
+let optional_object_field t f =
   try List.assoc f t
   with Not_found -> Json.Null
 
-let is_object_field_present t f =
+let has_object_field t f =
   try ignore (List.assoc f t); true
   with Not_found -> false
