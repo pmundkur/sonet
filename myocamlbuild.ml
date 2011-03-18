@@ -29,6 +29,7 @@ dispatch begin function
       Pathname.define_context "protocols/http/tests" ["eventloop"; "protocols/http"];
       Pathname.define_context "protocols/dbus" ["eventloop"];
       Pathname.define_context "protocols/dbus/tests" ["eventloop"; "protocols/dbus"];
+      Pathname.define_context "protocols/bencode/tests" ["protocols/bencode"];
       Pathname.define_context "codegen/json_convert/tests" ["codegen/json_convert"];
 
       (* Handle the C stubs in eventloop *)

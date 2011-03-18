@@ -21,7 +21,8 @@ CLEAN = rm -f *.annot *.cmi *.cmo *.cma *.cmxa *.cmx *.o *.a *.opt ocamlprof.dum
 EVENTLOOP_DIR = $(dir eventloop)
 HTTP_LIB_DIR = $(dir protocols/http)
 JSONRPC_LIB_DIR = $(dir protocols/jsonrpc)
+BENCODE_LIB_DIR = $(dir protocols/bencode)
 
 OCAMLFLAGS[] += -warn-error Ae -annot
 
-.SUBDIRS: eventloop protocols/dbus protocols/http protocols/jsonrpc codegen
+.SUBDIRS: eventloop protocols/dbus protocols/http protocols/jsonrpc protocols/bencode codegen

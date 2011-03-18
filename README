@@ -10,7 +10,7 @@ OCaml's Unix.select on other platforms.  It should be straightforward
 to bind to alternatives like kqueue on other platforms.
 
 Parsers and connection implementations exist for the HTTP/1.1 and
-D-Bus protocols.  A parser also exists for the JSON and JSONRPC
+D-Bus protocols.  Parsers also exist for the JSON, JSONRPC and Bencode
 formats.
 
 Two code-generators are provided to ease the use of JSON and JSONRPC.

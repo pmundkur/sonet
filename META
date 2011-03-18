@@ -23,3 +23,8 @@ package "dbuslib" (
   archive(byte) = "dbuslib.cma"
   archive(native) = "dbuslib.cmxa"
 )
+
+package "bencodelib" (
+  archive(byte) = "bencodelib.cma"
+  archive(native) = "bencodelib.cmxa"
+)

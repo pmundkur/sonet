@@ -1,0 +1,13 @@
+FILES[] =
+	bencode
+
+LIB = bencodelib
+BENCODE_LIB = $(OCamlLibrary $(LIB), $(FILES))
+
+.DEFAULT: $(BENCODE_LIB)
+
+.PHONY: clean
+clean:
+	$(CLEAN) $(BENCODE_LIB)
+
+.SUBDIRS: tests

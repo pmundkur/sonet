@@ -1,0 +1,15 @@
+OCAMLINCLUDES[] += $(BENCODE_LIB_DIR)
+
+OCAML_LIBS[] = $(BENCODE_LIB_DIR)/bencodelib
+
+OCAML_OTHER_LIBS[] +=
+        unix
+
+TEST_PARSER_PROG = test_bencode
+TEST_PARSER = $(OCamlProgram $(TEST_PARSER_PROG), test_bencode)
+
+.DEFAULT: $(TEST_PARSER)
+
+.PHONY: clean
+clean:
+	$(CLEAN) $(TEST_PARSER)
