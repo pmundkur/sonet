@@ -170,48 +170,52 @@ let pop_stack s =
     | [] ->
         raise_internal_error s "empty stack at pop_stack"
 
+let tostring_with_leading_zero_check s is =
+  let ris = List.rev is in
+  let check = function
+    | [] | [ '0' ] -> ()
+    | '0' :: tl when List.length tl > 0 ->
+        raise_invalid_leading_zero s (clist_to_string ris)
+    | _ -> () in
+    check ris;
+    clist_to_string ris
+
+let finish_int s is =
+  let str = tostring_with_leading_zero_check s is in
+  let int = try Int64.of_string str
+  with Failure _ -> raise_invalid_value s str "int" in
+    finish_value s (Json.Int int)
+
+let finish_int_exp s is es =
+  let int = tostring_with_leading_zero_check s is in
+  let exp = clist_to_string (List.rev es) in
+  let str = Printf.sprintf "%s.e%s" int exp in
+    (* If exp is positive, we might actually
+       succeed in making this an int, but
+       returning float is more uniform. *)
+  let float = try float_of_string str
+  with Failure _ -> raise_invalid_value s str "float" in
+    finish_value s (Json.Float float)
+
+let finish_float s is fs =
+  let int = tostring_with_leading_zero_check s is in
+  let frac = clist_to_string (List.rev fs) in
+  let str = Printf.sprintf "%s.%s" int frac in
+  let float = try float_of_string str
+  with Failure _ -> raise_invalid_value s str "float" in
+    finish_value s (Json.Float float)
+
+let finish_float_exp s is fs es =
+  let int = tostring_with_leading_zero_check s is in
+  let frac = clist_to_string (List.rev fs) in
+  let exp = clist_to_string (List.rev es) in
+  let str = Printf.sprintf "%s.%se%s" int frac exp in
+  let float = try float_of_string str
+  with Failure _ -> raise_invalid_value s str "float" in
+    finish_value s (Json.Float float)
+
 let rec parse_char s c =
   (* Printf.printf "parsing %C at line %d in state %s...\n" c s.line_num (current_cursor_value s.cursor); *)
-  let tostring_with_leading_zero_check is =
-    let ris = List.rev is in
-    let check = function
-      | [] | [ '0' ] -> ()
-      | '0' :: tl when List.length tl > 0 ->
-          raise_invalid_leading_zero s (clist_to_string ris)
-      | _ -> () in
-      check ris;
-      clist_to_string ris in
-  let finish_int is =
-    let str = tostring_with_leading_zero_check is in
-    let int = try Int64.of_string str
-    with Failure _ -> raise_invalid_value s str "int" in
-      finish_value s (Json.Int int) in
-  let finish_int_exp is es =
-    let int = tostring_with_leading_zero_check is in
-    let exp = clist_to_string (List.rev es) in
-    let str = Printf.sprintf "%s.e%s" int exp in
-      (* If exp is positive, we might actually
-         succeed in making this an int, but
-         returning float is more uniform. *)
-    let float = try float_of_string str
-    with Failure _ -> raise_invalid_value s str "float" in
-      finish_value s (Json.Float float) in
-  let finish_float is fs =
-    let int = tostring_with_leading_zero_check is in
-    let frac = clist_to_string (List.rev fs) in
-    let str = Printf.sprintf "%s.%s" int frac in
-    let float = try float_of_string str
-    with Failure _ -> raise_invalid_value s str "float" in
-      finish_value s (Json.Float float) in
-  let finish_float_exp is fs es =
-    let int = tostring_with_leading_zero_check is in
-    let frac = clist_to_string (List.rev fs) in
-    let exp = clist_to_string (List.rev es) in
-    let str = Printf.sprintf "%s.%se%s" int frac exp in
-    let float = try float_of_string str
-    with Failure _ -> raise_invalid_value s str "float" in
-      finish_value s (Json.Float float) in
-
     match s.cursor with
       | Start ->
           (match c with
@@ -297,11 +301,11 @@ let rec parse_char s c =
              | 'e' | 'E' ->
                  s.cursor <- In_int_exp (is, [])
              | ',' | ']' | '}' ->
-                 finish_int is;
+                 finish_int s is;
                  parse_char s c
              | _ when is_space c ->
                  update_line_num s c;
-                 finish_int is
+                 finish_int s is
              | _ ->
                  raise_unexpected_char s c "int")
       | In_float (is, fs) ->
@@ -311,11 +315,11 @@ let rec parse_char s c =
              | 'e' | 'E' ->
                  s.cursor <- In_float_exp (is, fs, [])
              | ',' | ']' | '}' ->
-                 finish_float is fs;
+                 finish_float s is fs;
                  parse_char s c
              | _ when is_space c ->
                  update_line_num s c;
-                 finish_float is fs
+                 finish_float s is fs
              | _ ->
                  raise_unexpected_char s c "float")
       | In_int_exp (is, es) ->
@@ -323,11 +327,11 @@ let rec parse_char s c =
              | '+' | '-' | '0' .. '9' ->
                  s.cursor <- In_int_exp (is, c :: es)
              | ',' | ']' | '}' ->
-                 finish_int_exp is es;
+                 finish_int_exp s is es;
                  parse_char s c
              | _ when is_space c ->
                  update_line_num s c;
-                 finish_int_exp is es
+                 finish_int_exp s is es
              | _ ->
                  raise_unexpected_char s c "int_exp")
       | In_float_exp (is, fs, es) ->
@@ -335,11 +339,11 @@ let rec parse_char s c =
              | '+' | '-' | '0' .. '9' ->
                  s.cursor <- In_float_exp (is, fs, c :: es)
              | ',' | ']' | '}' ->
-                 finish_float_exp is fs es;
+                 finish_float_exp s is fs es;
                  parse_char s c
              | _ when is_space c ->
                  update_line_num s c;
-                 finish_float_exp is fs es
+                 finish_float_exp s is fs es
              | _ ->
                  raise_unexpected_char s c "float_exp")
       | In_string cs ->
