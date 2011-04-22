@@ -25,8 +25,10 @@ type cursor =
   | In_false of int
   | In_int of sign * int
   | In_float of sign * int * char list
-  | In_int_exp of sign * int * char list
-  | In_float_exp of sign * int * char list * char list
+  | In_int_expsign of sign * int
+  | In_int_exp of sign * int * sign * int
+  | In_float_expsign of sign * int * char list
+  | In_float_exp of sign * int * char list * sign * int
   | In_string of Buffer.t
   | In_string_control of Buffer.t
   | In_string_hex of Buffer.t * char list * int
@@ -79,7 +81,8 @@ let current_cursor_value = function
   | Start | Expect_value -> "value"
   | In_null _ -> "null"
   | In_true _ | In_false _ -> "boolean"
-  | In_int _ | In_float _ | In_int_exp _ | In_float_exp _  -> "number"
+  | In_int _ | In_int_expsign _ | In_int_exp _
+  | In_float _ | In_float_expsign _ | In_float_exp _  -> "number"
   | In_string _ | In_string_control _ | In_string_hex _ -> "string"
   | Expect_object_elem_start | Expect_object_elem_colon | Expect_object_key -> "object"
   | Expect_comma_or_end -> "object/array"
@@ -182,13 +185,13 @@ let int_of sign d =
   let d64 = Int64.of_int d in
     if sign = Neg then Int64.neg d64 else d64
 
-let finish_int s sign d =
-  finish_value s (Json.Int (int_of sign d))
+let finish_int s ds d =
+  finish_value s (Json.Int (int_of ds d))
 
-let finish_int_exp s sign d es =
-  let int = int_of sign d in
-  let exp = clist_to_string (List.rev es) in
-  let str = Printf.sprintf "%Ld.e%s" int exp in
+let finish_int_exp s ds d es e =
+  let int = int_of ds d in
+  let exp = int_of es e in
+  let str = Printf.sprintf "%Ld.e%Ld" int exp in
     (* If exp is positive, we might actually
        succeed in making this an int, but
        returning float is more uniform. *)
@@ -196,19 +199,19 @@ let finish_int_exp s sign d es =
   with Failure _ -> raise_invalid_value s str "float" in
     finish_value s (Json.Float float)
 
-let finish_float s sign d fs =
-  let int = int_of sign d in
+let finish_float s ds d fs =
+  let int = int_of ds d in
   let frac = clist_to_string (List.rev fs) in
   let str = Printf.sprintf "%Ld.%s" int frac in
   let float = try float_of_string str
   with Failure _ -> raise_invalid_value s str "float" in
     finish_value s (Json.Float float)
 
-let finish_float_exp s sign d fs es =
-  let int = int_of sign d in
+let finish_float_exp s ds d fs es e =
+  let int = int_of ds d in
   let frac = clist_to_string (List.rev fs) in
-  let exp = clist_to_string (List.rev es) in
-  let str = Printf.sprintf "%Ld.%se%s" int frac exp in
+  let exp = int_of es e in
+  let str = Printf.sprintf "%Ld.%se%Ld" int frac exp in
   let float = try float_of_string str
   with Failure _ -> raise_invalid_value s str "float" in
     finish_value s (Json.Float float)
@@ -295,58 +298,79 @@ let rec parse_char s c =
                  finish_value s (Json.Bool false)
              | _ ->
                  raise_unexpected_char s c "false")
-      | In_int (sign, d) ->
+      | In_int (ds, d) ->
           (match c with
              | '0' .. '9' ->
-                 s.cursor <- In_int (sign, 10 * d + dig c)
+                 s.cursor <- In_int (ds, 10 * d + dig c)
              | '.' ->
-                 s.cursor <- In_float (sign, d, [])
+                 s.cursor <- In_float (ds, d, [])
              | 'e' | 'E' ->
-                 s.cursor <- In_int_exp (sign, d, [])
+                 s.cursor <- In_int_expsign (ds, d)
              | ',' | ']' | '}' ->
-                 finish_int s sign d;
+                 finish_int s ds d;
                  parse_char s c
              | _ when is_space c ->
                  update_line_num s c;
-                 finish_int s sign d
+                 finish_int s ds d
              | _ ->
                  raise_unexpected_char s c "int")
-      | In_float (sign, d, fs) ->
+      | In_float (ds, d, fs) ->
           (match c with
              | '0' .. '9' ->
-                 s.cursor <- In_float (sign, d, c :: fs)
+                 s.cursor <- In_float (ds, d, c :: fs)
              | 'e' | 'E' ->
-                 s.cursor <- In_float_exp (sign, d, fs, [])
+                 s.cursor <- In_float_expsign (ds, d, fs)
              | ',' | ']' | '}' ->
-                 finish_float s sign d fs;
+                 finish_float s ds d fs;
                  parse_char s c
              | _ when is_space c ->
                  update_line_num s c;
-                 finish_float s sign d fs
+                 finish_float s ds d fs
              | _ ->
                  raise_unexpected_char s c "float")
-      | In_int_exp (sign, d, es) ->
+      | In_int_expsign (ds, d) ->
           (match c with
-             | '+' | '-' | '0' .. '9' ->
-                 s.cursor <- In_int_exp (sign, d, c :: es)
+             | '+' ->
+                 s.cursor <- In_int_exp (ds, d, Pos, 0)
+             | '0' .. '9' ->
+                 s.cursor <- In_int_exp (ds, d, Pos, dig c)
+             | '-' ->
+                 s.cursor <- In_int_exp (ds, d, Neg, 0)
+             | _ ->
+                 raise_unexpected_char s c "int_expsign"
+          )
+      | In_int_exp (ds, d, es, e) ->
+          (match c with
+             | '0' .. '9' ->
+                 s.cursor <- In_int_exp (ds, d, es, 10 * e + dig c)
              | ',' | ']' | '}' ->
-                 finish_int_exp s sign d es;
+                 finish_int_exp s ds d es e;
                  parse_char s c
              | _ when is_space c ->
                  update_line_num s c;
-                 finish_int_exp s sign d es
+                 finish_int_exp s ds d es e
              | _ ->
                  raise_unexpected_char s c "int_exp")
-      | In_float_exp (sign, d, fs, es) ->
+      | In_float_expsign (ds, d, fs) ->
           (match c with
-             | '+' | '-' | '0' .. '9' ->
-                 s.cursor <- In_float_exp (sign, d, fs, c :: es)
+             | '+' ->
+                 s.cursor <- In_float_exp (ds, d, fs, Pos, 0)
+             | '0' .. '9' ->
+                 s.cursor <- In_float_exp (ds, d, fs, Pos, dig c)
+             | '-' ->
+                 s.cursor <- In_float_exp (ds, d, fs, Neg, 0)
+             | _ ->
+                 raise_unexpected_char s c "float_expsign")
+      | In_float_exp (ds, d, fs, es, e) ->
+          (match c with
+             | '0' .. '9' ->
+                 s.cursor <- In_float_exp (ds, d, fs, es, 10 * e + dig c)
              | ',' | ']' | '}' ->
-                 finish_float_exp s sign d fs es;
+                 finish_float_exp s ds d fs es e;
                  parse_char s c
              | _ when is_space c ->
                  update_line_num s c;
-                 finish_float_exp s sign d fs es
+                 finish_float_exp s ds d fs es e
              | _ ->
                  raise_unexpected_char s c "float_exp")
       | In_string b ->
