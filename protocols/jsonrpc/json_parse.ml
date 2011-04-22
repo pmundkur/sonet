@@ -23,9 +23,9 @@ type cursor =
   | In_float of char list * char list
   | In_int_exp of char list * char list
   | In_float_exp of char list * char list * char list
-  | In_string of char list
-  | In_string_control of char list
-  | In_string_hex of char list * char list * int
+  | In_string of Buffer.t
+  | In_string_control of Buffer.t
+  | In_string_hex of Buffer.t * char list * int
   | Expect_object_elem_start
   | Expect_object_elem_colon
   | Expect_comma_or_end
@@ -42,14 +42,16 @@ type parse_state = {
   mutable cursor: cursor;
   mutable stack: int_value list;
   mutable num_chars_parsed: int;
-  mutable line_num: int
+  mutable line_num: int;
+  mutable string_buffer_size: int;
 }
 
 let init_parse_state () = {
   cursor = Start;
   stack = [];
   num_chars_parsed = 0;
-  line_num = 1
+  line_num = 1;
+  string_buffer_size = 512;
 }
 
 let is_parsing_object s =
@@ -228,7 +230,7 @@ let rec parse_char s c =
              | '-' | '0' .. '9' ->
                  s.cursor <- In_int [c]
              | '"' ->
-                 s.cursor <- In_string []
+                 s.cursor <- In_string (Buffer.create s.string_buffer_size)
              | '{' ->
                  s.cursor <- Expect_object_elem_start
              | '[' ->
@@ -250,7 +252,7 @@ let rec parse_char s c =
              | '-' | '0' .. '9' ->
                  s.cursor <- In_int [c]
              | '"' ->
-                 s.cursor <- In_string []
+                 s.cursor <- In_string (Buffer.create s.string_buffer_size)
              | '{' ->
                  s.cursor <- Expect_object_elem_start
              | '[' ->
@@ -346,48 +348,56 @@ let rec parse_char s c =
                  finish_float_exp s is fs es
              | _ ->
                  raise_unexpected_char s c "float_exp")
-      | In_string cs ->
+      | In_string b ->
           (match c with
              | '\\' ->
-                 s.cursor <- In_string_control cs
+                 s.cursor <- In_string_control b
              | '"' ->
-                 finish_value s (Json.String (clist_to_string (List.rev cs)))
+                 finish_value s (Json.String (Buffer.contents b))
              | _ ->
-                 if is_valid_unescaped_char c then s.cursor <- In_string (c :: cs)
+                 if is_valid_unescaped_char c then Buffer.add_char b c
                  else raise_unexpected_char s c "string")
-      | In_string_control cs ->
+      | In_string_control b ->
           (match c with
              | '"' | '\\' | '/' ->
-                 s.cursor <- In_string (c :: cs)
+                 Buffer.add_char b c;
+                 s.cursor <- In_string b;
              | 'b' ->
-                 s.cursor <- In_string ('\b' :: cs)
+                 Buffer.add_char b '\b';
+                 s.cursor <- In_string b;
              | 'f' ->
-                 s.cursor <- In_string ('\x0c' :: cs)
+                 Buffer.add_char b '\x0c';
+                 s.cursor <- In_string b;
              | 'n' ->
-                 s.cursor <- In_string ('\n' :: cs)
+                 Buffer.add_char b '\n';
+                 s.cursor <- In_string b;
              | 'r' ->
-                 s.cursor <- In_string ('\r' :: cs)
+                 Buffer.add_char b '\r';
+                 s.cursor <- In_string b;
              | 't' ->
-                 s.cursor <- In_string ('\t' :: cs)
+                 Buffer.add_char b '\t';
+                 s.cursor <- In_string b;
              | 'u' ->
-                 s.cursor <- In_string_hex (cs, [], 4)
+                 s.cursor <- In_string_hex (b, [], 4)
              | _ ->
                  raise_unexpected_char s c "string_control")
-      | In_string_hex (cs, hs, rem) ->
+      | In_string_hex (b, hs, rem) ->
           (if is_hex_char c then begin
              let hs = c :: hs in
                if rem > 1 then
-                 s.cursor <- In_string_hex (cs, hs, rem - 1)
-               else
+                 s.cursor <- In_string_hex (b, hs, rem - 1)
+               else begin
                  (* TODO: We currently just leave the unicode escapes in place. *)
-                 s.cursor <- In_string (hs @ ('u' :: '\\' :: cs))
+                 Buffer.add_string b (clist_to_string ('\\' :: 'u' :: (List.rev hs)));
+                 s.cursor <- In_string b
+               end
            end else
              raise_unexpected_char s c "string_unicode")
       | Expect_object_elem_start ->
           (match c with
              | '"' ->
                  s.stack <- (IObject_needs_key []) :: s.stack;
-                 s.cursor <- In_string []
+                 s.cursor <- In_string (Buffer.create s.string_buffer_size)
              | '}' ->
                  finish_value s (Json.Object (Array.of_list []))
              | _ when is_space c ->
@@ -424,7 +434,7 @@ let rec parse_char s c =
                     | IObject fields :: tl -> s.stack <- IObject_needs_key fields :: tl
                     | io :: _ -> raise_internal_error s ("unexpected " ^ (ivalue_to_str io) ^ " on stack at object_key")
                     | [] -> raise_internal_error s "empty stack at object_key");
-                 s.cursor <- In_string []
+                 s.cursor <- In_string (Buffer.create s.string_buffer_size)
              | _ when is_space c ->
                  update_line_num s c
              | _ ->
