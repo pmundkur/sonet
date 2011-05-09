@@ -37,7 +37,7 @@ let string_of_type t =
 
 let escape_string s =
   let buf = Buffer.create 80 in
-    Buffer.add_string buf "\"";
+    Buffer.add_char buf '"';
     for i = 0 to String.length s - 1 do
       let x =
         match s.[i] with
@@ -53,7 +53,7 @@ let escape_string s =
       in
         Buffer.add_string buf x
     done;
-    Buffer.add_string buf "\"";
+    Buffer.add_char buf '"';
     Buffer.contents buf
 
 let rec list_iter_between f o a =
