@@ -23,6 +23,8 @@ type cursor =
   | In_null of int
   | In_true of int
   | In_false of int
+  | In_int_sign of sign
+  | In_int_zero of sign
   | In_int of sign * int
   | In_float of sign * int * char list
   | In_int_expsign of sign * int
@@ -81,7 +83,7 @@ let current_cursor_value = function
   | Start | Expect_value -> "value"
   | In_null _ -> "null"
   | In_true _ | In_false _ -> "boolean"
-  | In_int _ | In_int_expsign _ | In_int_exp _
+  | In_int_sign _ | In_int_zero _ | In_int _ | In_int_expsign _ | In_int_exp _
   | In_float _ | In_float_expsign _ | In_float_exp _  -> "number"
   | In_string _ | In_string_control _ | In_string_hex _ -> "string"
   | Expect_object_elem_start | Expect_object_elem_colon | Expect_object_key -> "object"
@@ -228,8 +230,10 @@ let rec parse_char s c =
              | 'f' ->
                  s.cursor <- In_false 4
              | '-' ->
-                 s.cursor <- In_int (Neg, 0)
-             | '0' .. '9' ->
+                 s.cursor <- In_int_sign Neg
+             | '0' ->
+                 s.cursor <- In_int_zero Pos
+             | '1' .. '9' ->
                  s.cursor <- In_int (Pos, dig c)
              | '"' ->
                  s.cursor <- In_string (Buffer.create s.string_buffer_size)
@@ -252,8 +256,10 @@ let rec parse_char s c =
              | 'f' ->
                  s.cursor <- In_false 4
              | '-' ->
-                 s.cursor <- In_int (Neg, 0)
-             | '0' .. '9' ->
+                 s.cursor <- In_int_sign Neg
+             | '0' ->
+                 s.cursor <- In_int_zero Pos
+             | '1' .. '9' ->
                  s.cursor <- In_int (Pos, dig c)
              | '"' ->
                  s.cursor <- In_string (Buffer.create s.string_buffer_size)
@@ -298,6 +304,28 @@ let rec parse_char s c =
                  finish_value s (Json.Bool false)
              | _ ->
                  raise_unexpected_char s c "false")
+      | In_int_sign ds ->
+          (match c with
+             | '0' ->
+                 s.cursor <- In_int_zero ds
+             | '1' .. '9' ->
+                 s.cursor <- In_int (ds, dig c)
+             | _ ->
+                 raise_unexpected_char s c "int_sign")
+      | In_int_zero ds ->
+          (match c with
+             | '.' ->
+                 s.cursor <- In_float (ds, 0, [])
+             | 'e' | 'E' ->
+                 s.cursor <- In_int_expsign (ds, 0)
+             | ',' | ']' | '}' ->
+                 finish_int s ds 0;
+                 parse_char s c
+             | _ when is_space c ->
+                 update_line_num s c;
+                 finish_int s ds 0
+             | _ ->
+                 raise_unexpected_char s c "int_zero")
       | In_int (ds, d) ->
           (match c with
              | '0' .. '9' ->
