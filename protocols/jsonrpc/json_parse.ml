@@ -28,8 +28,10 @@ type cursor =
   | In_int of sign * int
   | In_float of sign * int * char list
   | In_int_expsign of sign * int
+  | In_int_expdig of sign * int * sign
   | In_int_exp of sign * int * sign * int
   | In_float_expsign of sign * int * char list
+  | In_float_expdig of sign * int * char list * sign
   | In_float_exp of sign * int * char list * sign * int
   | In_string of Buffer.t
   | In_string_control of Buffer.t
@@ -83,8 +85,8 @@ let current_cursor_value = function
   | Start | Expect_value -> "value"
   | In_null _ -> "null"
   | In_true _ | In_false _ -> "boolean"
-  | In_int_sign _ | In_int_zero _ | In_int _ | In_int_expsign _ | In_int_exp _
-  | In_float _ | In_float_expsign _ | In_float_exp _  -> "number"
+  | In_int_sign _ | In_int_zero _ | In_int _ | In_int_expsign _ | In_int_expdig _ | In_int_exp _
+  | In_float _ | In_float_expsign _ | In_float_expdig _ | In_float_exp _  -> "number"
   | In_string _ | In_string_control _ | In_string_hex _ -> "string"
   | Expect_object_elem_start | Expect_object_elem_colon | Expect_object_key -> "object"
   | Expect_comma_or_end -> "object/array"
@@ -359,14 +361,20 @@ let rec parse_char s c =
       | In_int_expsign (ds, d) ->
           (match c with
              | '+' ->
-                 s.cursor <- In_int_exp (ds, d, Pos, 0)
+                 s.cursor <- In_int_expdig (ds, d, Pos)
              | '0' .. '9' ->
                  s.cursor <- In_int_exp (ds, d, Pos, dig c)
              | '-' ->
-                 s.cursor <- In_int_exp (ds, d, Neg, 0)
+                 s.cursor <- In_int_expdig (ds, d, Neg)
              | _ ->
                  raise_unexpected_char s c "int_expsign"
           )
+      | In_int_expdig (ds, d, es) ->
+          (match c with
+             | '0' .. '9' ->
+                 s.cursor <- In_int_exp (ds, d, es, dig c)
+             | _ ->
+                 raise_unexpected_char s c "int_expdig")
       | In_int_exp (ds, d, es, e) ->
           (match c with
              | '0' .. '9' ->
@@ -382,13 +390,19 @@ let rec parse_char s c =
       | In_float_expsign (ds, d, fs) ->
           (match c with
              | '+' ->
-                 s.cursor <- In_float_exp (ds, d, fs, Pos, 0)
+                 s.cursor <- In_float_expdig (ds, d, fs, Pos)
              | '0' .. '9' ->
                  s.cursor <- In_float_exp (ds, d, fs, Pos, dig c)
              | '-' ->
-                 s.cursor <- In_float_exp (ds, d, fs, Neg, 0)
+                 s.cursor <- In_float_expdig (ds, d, fs, Neg)
              | _ ->
                  raise_unexpected_char s c "float_expsign")
+      | In_float_expdig (ds, d, fs, es) ->
+          (match c with
+             | '0' .. '9' ->
+                 s.cursor <- In_float_exp (ds, d, fs, es, dig c)
+             | _ ->
+                 raise_unexpected_char s c "float_expdig")
       | In_float_exp (ds, d, fs, es, e) ->
           (match c with
              | '0' .. '9' ->
