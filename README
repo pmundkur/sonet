@@ -25,3 +25,25 @@ Building:
 Sonet can be built using ocamlbuild (via make) or OMake.  The build
 using ocamlbuild does not currently build the JSON code-generators;
 the build using OMake is comprehensive.
+
+Installing:
+-----------
+
+Installation currently uses the ocamlbuild build and depends on
+findlib.
+
+$ make install
+
+Uninstalling:
+-------------
+
+From source directory:
+
+$ make uninstall
+
+Otherwise:
+
+$ ocamlfind remove sonet
+
+For system-wide OCaml installations, the install and uninstall
+commands above will have to be run as root.
