@@ -14,11 +14,6 @@
  */
 
 #include <errno.h>
-#include <sys/epoll.h>
-#include <sys/resource.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
 
 #include <caml/mlvalues.h>
 #include <caml/memory.h>
@@ -29,6 +24,125 @@
 #include <caml/signals.h>
 
 #include "eventloop.h"
+
+static int error_table[] = {
+    E2BIG, EACCES, EAGAIN, EBADF, EBUSY, ECHILD, EDEADLK, EDOM,
+    EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, EISDIR, EMFILE, EMLINK,
+    ENAMETOOLONG, ENFILE, ENODEV, ENOENT, ENOEXEC, ENOLCK, ENOMEM, ENOSPC,
+    ENOSYS, ENOTDIR, ENOTEMPTY, ENOTTY, ENXIO, EPERM, EPIPE, ERANGE,
+    EROFS, ESPIPE, ESRCH, EXDEV, EWOULDBLOCK, EINPROGRESS, EALREADY,
+    ENOTSOCK, EDESTADDRREQ, EMSGSIZE, EPROTOTYPE, ENOPROTOOPT,
+    EPROTONOSUPPORT, ESOCKTNOSUPPORT, EOPNOTSUPP, EPFNOSUPPORT,
+    EAFNOSUPPORT, EADDRINUSE, EADDRNOTAVAIL, ENETDOWN, ENETUNREACH,
+    ENETRESET, ECONNABORTED, ECONNRESET, ENOBUFS, EISCONN, ENOTCONN,
+    ESHUTDOWN, ETOOMANYREFS, ETIMEDOUT, ECONNREFUSED, EHOSTDOWN,
+    EHOSTUNREACH, ELOOP, EOVERFLOW
+};
+
+static void raise_unix_error(int errnum, char *fn_name, char *fn_param) {
+    CAMLparam0();
+    CAMLlocal2(v_fn_name, v_fn_param);
+    CAMLlocalN(ea_vec, 3);
+
+    int i;
+
+    static value *caml_unix_exc_constr = NULL;
+    if (NULL == caml_unix_exc_constr) {
+        caml_unix_exc_constr = caml_named_value(UNIX_EXCEPTION_NAME);
+        if (NULL == caml_unix_exc_constr)
+            invalid_argument("Exception Unix.Unix_error not initialized, please link unix.cma");
+    }
+
+    v_fn_name = (NULL == fn_name) ? Atom(String_tag) : caml_copy_string(fn_name);
+    v_fn_param = (NULL == fn_param) ? Atom(String_tag) : caml_copy_string(fn_param);
+
+    ea_vec[0] = Val_int(-1);
+    for (i = 0; i < sizeof(error_table)/sizeof(int); i++) {
+        if (errnum == error_table[i]) {
+            ea_vec[0] = Val_int(i);
+            break;
+        }
+    }
+    if (Val_int(-1) == ea_vec[0]) {
+        ea_vec[0] = alloc_small(1, 0);
+        Field(ea_vec[0], 0) = Val_int(errnum);
+    }
+    ea_vec[1] = v_fn_name;
+    ea_vec[2] = v_fn_param;
+    caml_raise_with_args(*caml_unix_exc_constr, 3, ea_vec);
+
+    CAMLreturn0;
+}
+
+#ifndef linux
+
+CAMLprim value stub_epoll_create(value size) {
+    CAMLparam1(size);
+    raise_unix_error(ENOTSUP, "epoll_create", "");
+    CAMLreturn(Val_unit);
+}
+
+CAMLprim value stub_epoll_add(value es, value fd) {
+    CAMLparam2(es, fd);
+    raise_unix_error(ENOTSUP, "epoll_ctl", "");
+    CAMLreturn(Val_unit);
+}
+
+CAMLprim value stub_epoll_remove(value es, value fd) {
+    CAMLparam2(es, fd);
+    raise_unix_error(ENOTSUP, "epoll_ctl", "");
+    CAMLreturn(Val_unit);
+}
+
+CAMLprim value stub_epoll_enable_recv(value es, value fd) {
+    CAMLparam2(es, fd);
+    raise_unix_error(ENOTSUP, "epoll_ctl", "");
+    CAMLreturn(Val_unit);
+}
+
+CAMLprim value stub_epoll_disable_recv(value es, value fd) {
+    CAMLparam2(es, fd);
+    raise_unix_error(ENOTSUP, "epoll_ctl", "");
+    CAMLreturn(Val_unit);
+}
+
+CAMLprim value stub_epoll_enable_send(value es, value fd) {
+    CAMLparam2(es, fd);
+    raise_unix_error(ENOTSUP, "epoll_ctl", "");
+    CAMLreturn(Val_unit);
+}
+
+CAMLprim value stub_epoll_disable_send(value es, value fd) {
+    CAMLparam2(es, fd);
+    raise_unix_error(ENOTSUP, "epoll_ctl", "");
+    CAMLreturn(Val_unit);
+}
+
+CAMLprim value stub_epoll_is_recv_enabled(value es, value fd) {
+    CAMLparam2(es, fd);
+    raise_unix_error(ENOTSUP, "epoll", "");
+    CAMLreturn(Val_unit);
+}
+
+CAMLprim value stub_epoll_is_send_enabled(value es, value fd) {
+    CAMLparam2(es, fd);
+    raise_unix_error(ENOTSUP, "epoll", "");
+    CAMLreturn(Val_unit);
+}
+
+CAMLprim value stub_epoll_get_events(value es, value timeout) {
+    CAMLparam2(es, timeout);
+    raise_unix_error(ENOTSUP, "epoll", "");
+    CAMLreturn(Val_unit);
+}
+
+#else
+
+#include <sys/epoll.h>
+#include <sys/resource.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
 
 #ifndef MAX_EPOLL_FDS
 #define MAX_EPOLL_FDS 2048
@@ -64,55 +178,6 @@ static struct custom_operations epoll_state_ops = {
     custom_serialize_default,
     custom_deserialize_default
 };
-
-static int error_table[] = {
-    E2BIG, EACCES, EAGAIN, EBADF, EBUSY, ECHILD, EDEADLK, EDOM,
-    EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, EISDIR, EMFILE, EMLINK,
-    ENAMETOOLONG, ENFILE, ENODEV, ENOENT, ENOEXEC, ENOLCK, ENOMEM, ENOSPC,
-    ENOSYS, ENOTDIR, ENOTEMPTY, ENOTTY, ENXIO, EPERM, EPIPE, ERANGE,
-    EROFS, ESPIPE, ESRCH, EXDEV, EWOULDBLOCK, EINPROGRESS, EALREADY,
-    ENOTSOCK, EDESTADDRREQ, EMSGSIZE, EPROTOTYPE, ENOPROTOOPT,
-    EPROTONOSUPPORT, ESOCKTNOSUPPORT, EOPNOTSUPP, EPFNOSUPPORT,
-    EAFNOSUPPORT, EADDRINUSE, EADDRNOTAVAIL, ENETDOWN, ENETUNREACH,
-    ENETRESET, ECONNABORTED, ECONNRESET, ENOBUFS, EISCONN, ENOTCONN,
-    ESHUTDOWN, ETOOMANYREFS, ETIMEDOUT, ECONNREFUSED, EHOSTDOWN,
-    EHOSTUNREACH, ELOOP, EOVERFLOW
-};
-
-void raise_unix_error(int errnum, char *fn_name, char *fn_param) {
-    CAMLparam0();
-    CAMLlocal2(v_fn_name, v_fn_param);
-    CAMLlocalN(ea_vec, 3);
-
-    int i;
-
-    static value *caml_unix_exc_constr = NULL;
-    if (NULL == caml_unix_exc_constr) {
-        caml_unix_exc_constr = caml_named_value(UNIX_EXCEPTION_NAME);
-        if (NULL == caml_unix_exc_constr)
-            invalid_argument("Exception Unix.Unix_error not initialized, please link unix.cma");
-    }
-
-    v_fn_name = (NULL == fn_name) ? Atom(String_tag) : caml_copy_string(fn_name);
-    v_fn_param = (NULL == fn_param) ? Atom(String_tag) : caml_copy_string(fn_param);
-
-    ea_vec[0] = Val_int(-1);
-    for (i = 0; i < sizeof(error_table)/sizeof(int); i++) {
-        if (errnum == error_table[i]) {
-            ea_vec[0] = Val_int(i);
-            break;
-        }
-    }
-    if (Val_int(-1) == ea_vec[0]) {
-        ea_vec[0] = alloc_small(1, 0);
-        Field(ea_vec[0], 0) = Val_int(errnum);
-    }
-    ea_vec[1] = v_fn_name;
-    ea_vec[2] = v_fn_param;
-    caml_raise_with_args(*caml_unix_exc_constr, 3, ea_vec);
-
-    CAMLreturn0;
-}
 
 CAMLprim value stub_epoll_create(value size) {
     CAMLparam1(size);
@@ -406,3 +471,5 @@ CAMLprim value stub_test_get_events(value es) {
 
     CAMLreturn(result);
 }
+
+#endif
