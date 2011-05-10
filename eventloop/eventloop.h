@@ -15,6 +15,6 @@
 #define RECORD_EVENT_TYPE_OFS       0
 #define RECORD_EVENT_FD_OFS         1
 
-#define UNIX_EXCEPTION_NAME         "onet.unix_error_exception"
+#define UNIX_EXCEPTION_NAME         "sonet.unix_error_exception"
 
 #endif

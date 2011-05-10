@@ -133,7 +133,7 @@ and t = {
 let inited = ref false
 let init () =
   if not !inited then begin
-    Callback.register_exception "onet.unix_error_exception"
+    Callback.register_exception "sonet.unix_error_exception"
       (Unix.Unix_error (Unix.EEXIST, "string", "string"));
     inited := true
   end
