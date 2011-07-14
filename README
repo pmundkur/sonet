@@ -32,7 +32,7 @@ Installing:
 Installation currently uses the ocamlbuild build and depends on
 findlib.
 
-$ make install
+$ make && make install
 
 Uninstalling:
 -------------

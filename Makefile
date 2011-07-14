@@ -51,7 +51,7 @@ clean:
 	make -C $(DBUS_DIR)/tests clean
 	make -C $(BENCODE_DIR)/tests clean
 
-install: all
+install:
 	ocamlfind install $(LIB) META $(INSTALLS)
 
 uninstall:
