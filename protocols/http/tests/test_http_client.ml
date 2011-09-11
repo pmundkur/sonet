@@ -75,15 +75,15 @@ let run () =
   let verbose = ref false in
   let get_url urls =
     List.iter check_supported_url urls;
-    reqs := (R.Get, Client.Payload (urls, None)) :: !reqs in
+    reqs := (R.Get, Client.Payload (urls, None), 0) :: !reqs in
   let send_url meth urls filename =
     List.iter check_supported_url urls;
     let fd = U.openfile filename [U.O_RDONLY] 0 in
-      reqs := (meth, Client.FileSend (urls, fd)) :: !reqs in
+      reqs := (meth, Client.FileSend (urls, fd), 0) :: !reqs in
   let save_url urls filename =
     List.iter check_supported_url urls;
     let fd = U.openfile filename [U.O_WRONLY; U.O_CREAT; U.O_TRUNC] 0o640 in
-      reqs := (R.Get, Client.FileRecv (urls, fd)) :: !reqs in
+      reqs := (R.Get, Client.FileRecv (urls, fd), 0) :: !reqs in
   let num_args = Array.length Sys.argv in
   let get_arg opt indx =
     if indx >= num_args

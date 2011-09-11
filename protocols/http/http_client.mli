@@ -1,6 +1,6 @@
 (**************************************************************************)
 (*                                                                        *)
-(*  Copyright (C) 2010      Prashanth Mundkur.                            *)
+(*  Copyright (C) 2010, 2011  Prashanth Mundkur.                          *)
 (*  Author  Prashanth Mundkur <prashanth.mundkur _at_ gmail.com>          *)
 (*                                                                        *)
 (*  This program is free software; you can redistribute it and/or         *)
@@ -24,6 +24,8 @@ type request =
   | FileRecv of url list * Unix.file_descr
   | FileSend of url list * Unix.file_descr
 
+type request_id = int
+
 type error =
   | Unix of Unix.error
   | Http of (* status code *) int * string
@@ -37,10 +39,11 @@ exception Invalid_url of url * string
 val is_supported_url : url -> bool
 
 type result = {
+  request_id : request_id;
   meth : Http.Request_header.meth;
   url : url;
   response : Http.Response.t option;
   error : (url * error) list option;
 }
 
-val request : (meth * request) list -> result list
+val request : (meth * request * request_id) list -> result list

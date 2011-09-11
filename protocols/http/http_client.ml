@@ -28,6 +28,8 @@ type request =
   | FileRecv of url list * Unix.file_descr
   | FileSend of url list * Unix.file_descr
 
+type request_id = int
+
 type error =
   | Unix of Unix.error
   | Http of (* status code *) int * string
@@ -42,6 +44,7 @@ exception Invalid_request of request
 exception Invalid_url of url * string
 
 type result = {
+  request_id : request_id;
   meth : H.Request_header.meth;
   url : url;
   response : H.Response.t option;
@@ -50,6 +53,7 @@ type result = {
 
 type callback = {
   c_req : request;
+  c_req_id : int;
   c_meth : H.Request_header.meth;
   c_fdofs : int;
   c_url : url;
@@ -75,10 +79,11 @@ let defopt def = function
 let close_conn final cb t =
   if final then begin
     let res = {
+      request_id = cb.c_req_id;
       meth = cb.c_meth;
       url = cb.c_url;
       response = cb.c_response;
-      error = cb.c_error
+      error = cb.c_error;
     } in
       cb.c_results :=  res :: !(cb.c_results)
   end;
@@ -213,9 +218,9 @@ let reset_fileofs { c_req; c_fdofs } =
     | FileRecv (_, fd) -> Unix.ftruncate fd c_fdofs
     | FileSend (_, fd) -> assert (Unix.lseek fd c_fdofs Unix.SEEK_SET = c_fdofs)
 
-let make_callback_arg c_meth c_req c_url c_alternates c_results =
+let make_callback_arg c_meth c_req c_req_id c_url c_alternates c_results =
   let c_fdofs = fileofs_of_req c_req in
-    { c_req; c_meth; c_fdofs; c_url; c_alternates; c_results;
+    { c_req; c_req_id; c_meth; c_fdofs; c_url; c_alternates; c_results;
       c_response = None; c_error = None }
 
 let content_length_hdr_of_fd fd =
@@ -266,7 +271,7 @@ let rec make_conn el cb_funcs
           None
       | Some e, [] ->
           let error = Some ((url, e) :: defopt [] c_error) in
-            Some { meth = cb_arg.c_meth; url; response = None; error }
+            Some { request_id = cb_arg.c_req_id; meth = cb_arg.c_meth; url; response = None; error }
       | Some e, c_url :: c_alternates ->
           let c_error = Some ((url, e) :: (defopt [] c_error)) in
             make_conn el cb_funcs { cb_arg with c_url; c_alternates; c_error }
@@ -294,11 +299,11 @@ let start_requests el requests =
   let rec starter = function
     | [] ->
         ()
-    | (meth, req) :: rest ->
+    | (meth, req, req_id) :: rest ->
         let url, alternates =
           (* We've ensured that there is at least one url *)
           match urls_of_req req with [] -> assert false | hd :: tl -> hd, tl in
-        let cb_arg = make_callback_arg meth req url alternates results in
+        let cb_arg = make_callback_arg meth req req_id url alternates results in
           start_conn el cb_arg;
           starter rest
   in
@@ -307,7 +312,7 @@ let start_requests el requests =
 
 let request reqs =
   (* Sanity check the requests to ensure at least one url *)
-  let () = List.iter (fun (_m, r) ->
+  let () = List.iter (fun (_m, r, _ri) ->
                         if urls_of_req r = [] then raise (Invalid_request r)
                      ) reqs in
   let el = Eventloop.create () in
