@@ -1,2 +1,2 @@
-<*.ml{i,}>: warn_A, warn_error_A, annot
+<**/*.ml{i,}>: annot
 "benchmarks": not_hygienic
