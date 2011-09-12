@@ -60,8 +60,8 @@ type callback = {
   c_alternates : url list;
   c_retries : int;
   c_results : result list ref;
-  mutable c_response : H.Response.t option;
-  mutable c_error : (url * error) list option;
+  c_response : H.Response.t option;
+  c_error : (url * error) list option;
 }
 
 module Conn = Http_client_conn.Make(struct type t = callback end)
@@ -93,8 +93,8 @@ let file_receiver fd cb t s o l f =
     ignore (Unix.write fd s o l)
   with
     | Unix.Unix_error (e, _, _) ->
-        cb.c_error <- Some ((cb.c_url, Unix e) :: defopt [] cb.c_error);
-        close_conn true cb t
+        let cb = { cb with c_error = Some ((cb.c_url, Unix e) :: defopt [] cb.c_error) }
+        in close_conn true cb t
 
 let file_sender fd buffer cb t () =
   try
@@ -102,7 +102,7 @@ let file_sender fd buffer cb t () =
       (nbytes = 0), buffer, 0, nbytes
   with
     | Unix.Unix_error (e, _, _) ->
-        cb.c_error <- Some ((cb.c_url, Unix e) :: defopt [] cb.c_error);
+        let cb = { cb with c_error = Some ((cb.c_url, Unix e) :: defopt [] cb.c_error) } in
         close_conn true cb t;
         true, buffer, 0, 0
 
@@ -116,8 +116,7 @@ let restart_after_error t e cb restarter =
   in
     match cb with
       | { c_retries } when c_retries <= 0 ->
-          cb.c_error <- c_error;
-          close_conn true cb t
+          close_conn true { cb with c_error } t
       | { c_alternates = [] } ->
           (* Retry the same url. *)
           do_restart { cb with c_retries }
@@ -125,13 +124,11 @@ let restart_after_error t e cb restarter =
           (* Retry with the next alternative. *)
           do_restart { cb with c_url = h; c_alternates = t @ [ c_url ]; c_retries }
 
-
 let response_callback restarter cb t resp =
   assert (cb.c_response = None);
   let status = resp.Http.Response.response.Http.Response_header.status_code in
     if status >= 200 && status < 299 then begin
-      cb.c_response <- Some resp;
-      close_conn true cb t
+      close_conn true { cb with c_response = Some resp } t
     end else if status = 503 then begin
       (* Server is overloaded; try an alternative. If there is only
          one alternative, it would be nicer to use a timer. *)
