@@ -58,12 +58,11 @@ type callback = {
   c_fdofs : int;
   c_url : url;
   c_alternates : url list;
+  c_retries : int;
   c_results : result list ref;
   mutable c_response : H.Response.t option;
   mutable c_error : (url * error) list option;
 }
-
-type state = callback array
 
 module Conn = Http_client_conn.Make(struct type t = callback end)
 
@@ -108,16 +107,24 @@ let file_sender fd buffer cb t () =
         true, buffer, 0, 0
 
 let restart_after_error t e cb restarter =
+  let c_retries = cb.c_retries - 1 in
   let c_error = Some ((cb.c_url, e) :: defopt [] cb.c_error) in
+  let do_restart cb =
+    let el = Conn.get_eventloop t in
+      close_conn false cb t;
+      restarter el cb
+  in
     match cb with
-      | { c_alternates = [] } ->
+      | { c_retries } when c_retries <= 0 ->
           cb.c_error <- c_error;
           close_conn true cb t
-      | { c_alternates = c_url :: rest } ->
-          let new_cb = { cb with c_url; c_alternates = rest; c_error } in
-          let el = Conn.get_eventloop t in
-            close_conn false cb t;
-            restarter el new_cb
+      | { c_alternates = [] } ->
+          (* Retry the same url. *)
+          do_restart { cb with c_retries }
+      | { c_url; c_alternates = h :: t } ->
+          (* Retry with the next alternative. *)
+          do_restart { cb with c_url = h; c_alternates = t @ [ c_url ]; c_retries }
+
 
 let response_callback restarter cb t resp =
   assert (cb.c_response = None);
@@ -125,6 +132,11 @@ let response_callback restarter cb t resp =
     if status >= 200 && status < 299 then begin
       cb.c_response <- Some resp;
       close_conn true cb t
+    end else if status = 503 then begin
+      (* Server is overloaded; try an alternative. If there is only
+         one alternative, it would be nicer to use a timer. *)
+      close_conn false cb t;
+      restart_after_error t (Http (status, "Server busy")) cb restarter
     end else if status = 300 or status = 301 or status = 302 then begin
       (* Perform redirection.  303 is not currently handled, and will
          be treated like an error. *)
@@ -218,9 +230,9 @@ let reset_fileofs { c_req; c_fdofs } =
     | FileRecv (_, fd) -> Unix.ftruncate fd c_fdofs
     | FileSend (_, fd) -> assert (Unix.lseek fd c_fdofs Unix.SEEK_SET = c_fdofs)
 
-let make_callback_arg c_meth c_req c_req_id c_url c_alternates c_results =
+let make_callback_arg c_meth c_req c_req_id c_url c_alternates c_retries c_results =
   let c_fdofs = fileofs_of_req c_req in
-    { c_req; c_req_id; c_meth; c_fdofs; c_url; c_alternates; c_results;
+    { c_req; c_req_id; c_meth; c_fdofs; c_url; c_alternates; c_retries; c_results;
       c_response = None; c_error = None }
 
 let content_length_hdr_of_fd fd =
@@ -294,7 +306,7 @@ and start_conn el cb_arg =
       | None -> ()
       | Some res -> cb_arg.c_results := res :: !(cb_arg.c_results)
 
-let start_requests el requests =
+let start_requests el retry_rounds requests =
   let results = ref [] in
   let rec starter = function
     | [] ->
@@ -303,20 +315,23 @@ let start_requests el requests =
         let url, alternates =
           (* We've ensured that there is at least one url *)
           match urls_of_req req with [] -> assert false | hd :: tl -> hd, tl in
-        let cb_arg = make_callback_arg meth req req_id url alternates results in
+        let retries = retry_rounds * (1 + List.length alternates) in
+        let cb_arg = make_callback_arg meth req req_id url alternates retries results in
           start_conn el cb_arg;
           starter rest
   in
     starter requests;
     results
 
-let request reqs =
+let dEFAULT_RETRY_ROUNDS = 2
+
+let request ?retry_rounds reqs =
   (* Sanity check the requests to ensure at least one url *)
   let () = List.iter (fun (_m, r, _ri) ->
                         if urls_of_req r = [] then raise (Invalid_request r)
                      ) reqs in
   let el = Eventloop.create () in
-  let results_ref = start_requests el reqs in
+  let results_ref = start_requests el (defopt dEFAULT_RETRY_ROUNDS retry_rounds) reqs in
     while Eventloop.has_connections el || Eventloop.has_timers el do
       Eventloop.dispatch el 1.0
     done;

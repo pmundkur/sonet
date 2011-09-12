@@ -46,4 +46,4 @@ type result = {
   error : (url * error) list option;
 }
 
-val request : (meth * request * request_id) list -> result list
+val request : ?retry_rounds:int -> (meth * request * request_id) list -> result list
