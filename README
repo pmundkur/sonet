@@ -19,6 +19,11 @@ types and JSON.  Another (gen_rpc) generates code for the client and
 server portions of a JSONRPC server, using an IDL description for the
 messages in the RPC protocol.
 
+Dependencies:
+-------------
+
+OCaml 3.12+
+
 Building:
 ---------
 
