@@ -126,15 +126,17 @@ module Make (Callback : CallbackType) = struct
       end else begin
         C.enable_recv t.conn;
         let top, cb = Queue.top t.recv_queue in
+        let st =
           match top with
-            | Small _
-            | StreamingSend _ ->
-                let st = H.Response.init_state () in
-                  t.recv_state <- Recv_incoming (st, cb)
-            | StreamingRecv (_, prcb)
-            | Streaming (_, _, prcb) ->
-                let st = H.Response.init_state ~payload_callback:prcb () in
-                  t.recv_state <- Recv_incoming (st, cb)
+            | Small req ->
+              H.Response.init_state req.H.Request.request
+            | StreamingSend (req_hdr, _) ->
+              H.Response.init_state req_hdr
+            | StreamingRecv (req, prcb) ->
+              H.Response.init_state ~payload_callback:prcb req.H.Request.request
+            | Streaming (req_hdr, _, prcb) ->
+              H.Response.init_state ~payload_callback:prcb req_hdr
+        in t.recv_state <- Recv_incoming (st, cb)
       end
 
   let prepare_for_next_response t =

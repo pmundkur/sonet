@@ -205,7 +205,11 @@ let compact_parse_requests input =
 
 let compact_parse_responses input =
   let ofs, rem = ref 0, ref (String.length input) in
-  let state = ref (Response.init_state ()) in
+
+  (* We can't really parse responses without knowing the corresponding
+     request, due to HEAD. We just fake a non-HEAD request for this test. *)
+  let fake_req = {Request_header.version = HTTP11; meth = Get; url = Request_header.Star; headers = []} in
+  let state = ref (Response.init_state fake_req) in
     while !rem > 0 do
       match Response.parse_substring !state input !ofs !rem with
         | Response.Result (r, consumed) ->
@@ -217,7 +221,7 @@ let compact_parse_responses input =
             incr messages;
             ofs := !ofs + consumed;
             rem := !rem - consumed;
-            state := Response.init_state ()
+            state := Response.init_state fake_req
         | Response.Parse_incomplete st ->
             if Response.num_bytes_parsed st > 0L then
               Printf.printf "Response incomplete!\n";

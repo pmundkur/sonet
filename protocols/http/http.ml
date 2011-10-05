@@ -1292,6 +1292,7 @@ module Response = struct
   type header_callback = Response_header.t -> Response_header.t
 
   type state = {
+    expect_payload: bool;
     mutable cursor: cursor;
     mutable s_response: Response_header.t option;
     mutable num_bytes_parsed: int64;
@@ -1310,7 +1311,8 @@ module Response = struct
 
   let raise_error err = raise (Http_error err)
 
-  let init_state ?header_callback ?payload_callback () = {
+  let init_state ?header_callback ?payload_callback req_hdr = {
+    expect_payload = req_hdr.Request_header.meth <> Head;
     cursor = In_response_header (Response_header.init_state ());
     s_response = None;
     num_bytes_parsed = 0L;
@@ -1350,14 +1352,17 @@ module Response = struct
                          ) in
                    state.s_response <- Some v;
                    state.num_bytes_parsed <- Int64.of_int (Response_header.num_bytes_parsed rs);
-                   (match Payload.init_from_response ?payload_callback:state.payload_callback v with
-                      | Payload.No_payload ->
+                   (match state.expect_payload, Payload.init_from_response ?payload_callback:state.payload_callback v with
+                      | false, _ ->
                           state.cursor <- Done;
                           Result ({ response = v; payload = None }, pre_consumed + consumed)
-                      | Payload.Error s ->
+                      | _, Payload.No_payload ->
+                          state.cursor <- Done;
+                          Result ({ response = v; payload = None }, pre_consumed + consumed)
+                      | _, Payload.Error s ->
                           state.cursor <- Done;
                           Error s
-                      | Payload.Payload ps ->
+                      | _, Payload.Payload ps ->
                           state.cursor <- In_payload ps;
                           (* recurse on remaining input *)
                           parse_helper state str (ofs + consumed) (len - consumed)

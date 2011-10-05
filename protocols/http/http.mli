@@ -233,7 +233,7 @@ module Response : sig
   type state
   type header_callback = Response_header.t -> Response_header.t
 
-  val init_state : ?header_callback:header_callback -> ?payload_callback:payload_callback -> unit -> state
+  val init_state : ?header_callback:header_callback -> ?payload_callback:payload_callback -> Request_header.t -> state
   val num_bytes_parsed : state -> int64
 
   type error = Internal_error of string
