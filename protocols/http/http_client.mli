@@ -15,7 +15,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type meth = Http.Request_header.meth
+type meth = Http.meth
 type url = string
 type payload = string
 
@@ -40,7 +40,7 @@ val is_supported_url : url -> bool
 
 type result = {
   request_id : request_id;
-  meth : Http.Request_header.meth;
+  meth : Http.meth;
   url : url;
   response : Http.Response.t option;
   error : (url * error) list option;

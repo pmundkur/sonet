@@ -19,7 +19,80 @@ val add_header : string -> string -> header_fields -> header_fields
 val is_header_present : string -> header_fields -> bool
 val lookup_header : string -> header_fields -> string list (* can throw Not_found *)
 
+(* Protocol constants *)
+
 type version = HTTP09 | HTTP10 | HTTP11
+
+val string_of_version : version -> string
+
+type meth =
+  | Get
+  | Put
+  | Head
+  | Post
+  | Trace
+  | Delete
+  | Connect
+  | Options
+  | Extension of string
+
+val string_of_meth : meth -> string
+
+type status =
+    (* Informational 1xx *)
+  | Status_continue
+  | Status_switching_protocols
+
+    (* Successful 2xx *)
+  | Status_ok
+  | Status_created
+  | Status_accepted
+  | Status_non_authoritative
+  | Status_no_content
+  | Status_reset_content
+  | Status_partial_content
+
+    (* Redirection 3xx *)
+  | Status_multiple_choices
+  | Status_moved_permanently
+  | Status_found
+  | Status_see_other
+  | Status_not_modified
+  | Status_use_proxy
+  | Status_temporary_redirect
+
+    (* Client Error 4xx *)
+  | Status_bad_request
+  | Status_unauthorized
+  | Status_payment_required
+  | Status_forbidden
+  | Status_not_found
+  | Status_method_not_allowed
+  | Status_not_acceptable
+  | Status_proxy_authentication_required
+  | Status_request_timeout
+  | Status_conflict
+  | Status_gone
+  | Status_length_required
+  | Status_precondition_failed
+  | Status_request_entity_too_large
+  | Status_request_uri_too_large
+  | Status_unsupported_media_type
+  | Status_requested_range_not_satisfiable
+  | Status_expectation_failed
+
+    (* Server Error 5xx *)
+  | Status_internal_server_error
+  | Status_not_implemented
+  | Status_bad_gateway
+  | Status_service_unavailable
+  | Status_gateway_timeout
+  | Status_version_not_supported
+
+    (* Other *)
+  | Status_other of int * string
+
+val status_info : status -> (* status code *) int * (* reason phrase *) string
 
 module Headers : sig
   type error
@@ -29,20 +102,7 @@ module Headers : sig
   val serialize : Buffer.t -> header_fields -> unit
 end
 
-
 module Request_header : sig
-  type meth =
-    | Get
-    | Put
-    | Head
-    | Post
-    | Trace
-    | Delete
-    | Connect
-    | Options
-    | Extension of string
-  val string_of_meth : meth -> string
-
   type url =
     | Star
     | Uri of Uri.t
@@ -72,62 +132,6 @@ module Request_header : sig
 end
 
 module Response_header : sig
-  type status =
-      (* Informational 1xx *)
-    | Status_continue
-    | Status_switching_protocols
-
-    (* Successful 2xx *)
-    | Status_ok
-    | Status_created
-    | Status_accepted
-    | Status_non_authoritative
-    | Status_no_content
-    | Status_reset_content
-    | Status_partial_content
-
-    (* Redirection 3xx *)
-    | Status_multiple_choices
-    | Status_moved_permanently
-    | Status_found
-    | Status_see_other
-    | Status_not_modified
-    | Status_use_proxy
-    | Status_temporary_redirect
-
-    (* Client Error 4xx *)
-    | Status_bad_request
-    | Status_unauthorized
-    | Status_payment_required
-    | Status_forbidden
-    | Status_not_found
-    | Status_method_not_allowed
-    | Status_not_acceptable
-    | Status_proxy_authentication_required
-    | Status_request_timeout
-    | Status_conflict
-    | Status_gone
-    | Status_length_required
-    | Status_precondition_failed
-    | Status_request_entity_too_large
-    | Status_request_uri_too_large
-    | Status_unsupported_media_type
-    | Status_requested_range_not_satisfiable
-    | Status_expectation_failed
-
-    (* Server Error 5xx *)
-    | Status_internal_server_error
-    | Status_not_implemented
-    | Status_bad_gateway
-    | Status_service_unavailable
-    | Status_gateway_timeout
-    | Status_version_not_supported
-
-    (* Other *)
-    | Status_other of int * string
-
-  val status_info : status -> (* status code *) int * (* reason phrase *) string
-
   type state
   val init_state : unit -> state
   val num_bytes_parsed : state -> int
@@ -217,6 +221,12 @@ module Request : sig
   val connection_closed : state -> unit
 
   val serialize : Buffer.t -> t -> unit
+
+  (* utility accessors *)
+  val version : t -> version
+  val meth : t -> meth
+  val headers : t -> header_fields
+  val payload_buf : t -> Buffer.t option
 end
 
 module Response : sig
@@ -246,5 +256,10 @@ module Response : sig
 
   val serialize : Buffer.t -> t -> unit
 
-  val make_response : ?payload:Payload.t -> headers:header_fields -> Response_header.status -> t
+  val make_response : ?payload:Payload.t -> headers:header_fields -> status -> t
+
+  (* utility accessors *)
+  val status_code : t -> int
+  val headers : t -> header_fields
+  val payload_buf : t -> Buffer.t option
 end

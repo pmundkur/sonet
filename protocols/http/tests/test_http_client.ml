@@ -16,7 +16,6 @@
 (**************************************************************************)
 
 module H = Http
-module R = Http.Request_header
 module Client = Http_client
 module U = Unix
 
@@ -42,7 +41,7 @@ let funopt f = function
   | Some e -> f e
 
 let show_result verbose r =
-  Printf.printf "\n%s %s: " (R.string_of_meth r.Client.meth) r.Client.url;
+  Printf.printf "\n%s %s: " (H.string_of_meth r.Client.meth) r.Client.url;
   (match r.Client.response with
      | None ->
          Printf.printf "No response\n"
@@ -75,7 +74,7 @@ let run () =
   let verbose = ref false in
   let get_url urls =
     List.iter check_supported_url urls;
-    reqs := (R.Get, Client.Payload (urls, None), 0) :: !reqs in
+    reqs := (H.Get, Client.Payload (urls, None), 0) :: !reqs in
   let send_url meth urls filename =
     List.iter check_supported_url urls;
     let fd = U.openfile filename [U.O_RDONLY] 0 in
@@ -83,14 +82,14 @@ let run () =
   let save_url urls filename =
     List.iter check_supported_url urls;
     let fd = U.openfile filename [U.O_WRONLY; U.O_CREAT; U.O_TRUNC] 0o640 in
-      reqs := (R.Get, Client.FileRecv (urls, fd), 0) :: !reqs in
+      reqs := (H.Get, Client.FileRecv (urls, fd), 0) :: !reqs in
   let num_args = Array.length Sys.argv in
   let get_arg opt indx =
     if indx >= num_args
     then (Printf.printf "Insufficient args for %s\n" opt; exit 1)
     else Sys.argv.(indx) in
   let meth_of_opt = function
-    | "-post" -> R.Post | _ -> R.Put in
+    | "-post" -> H.Post | _ -> H.Put in
   let is_opt a = a.[0] = '-' in
   let rec get_url_args indx =
     let rec helper i acc =

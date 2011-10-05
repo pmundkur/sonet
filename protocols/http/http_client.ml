@@ -21,7 +21,7 @@ module U = Unix
 
 type url = string
 type payload = string
-type meth = H.Request_header.meth
+type meth = H.meth
 
 type request =
   | Payload of url list * payload option
@@ -45,7 +45,7 @@ exception Invalid_url of url * string
 
 type result = {
   request_id : request_id;
-  meth : H.Request_header.meth;
+  meth : H.meth;
   url : url;
   response : H.Response.t option;
   error : (url * error) list option;
@@ -54,7 +54,7 @@ type result = {
 type callback = {
   c_req : request;
   c_req_id : int;
-  c_meth : H.Request_header.meth;
+  c_meth : H.meth;
   c_fdofs : int;
   c_url : url;
   c_alternates : url list;
@@ -64,7 +64,7 @@ type callback = {
   c_error : (url * error) list option;
 }
 
-module Conn = Http_client_conn.Make(struct type t = callback end)
+module Conn = C.Make(struct type t = callback end)
 
 let unopt opt e =
   match opt with
@@ -126,7 +126,7 @@ let restart_after_error t e cb restarter =
 
 let response_callback restarter cb t resp =
   assert (cb.c_response = None);
-  let status = resp.Http.Response.response.Http.Response_header.status_code in
+  let status = H.Response.status_code resp in
     if status >= 200 && status < 299 then begin
       close_conn true { cb with c_response = Some resp } t
     end else if status = 503 then begin
@@ -137,9 +137,9 @@ let response_callback restarter cb t resp =
     end else if status = 300 or status = 301 or status = 302 then begin
       (* Perform redirection.  303 is not currently handled, and will
          be treated like an error. *)
-      let headers = resp.Http.Response.response.Http.Response_header.headers in
+      let headers = H.Response.headers resp in
         try
-          match Http.lookup_header "Location" headers with
+          match H.lookup_header "Location" headers with
             | [] ->
                 restart_after_error t (Http (status, "HTTP redirect with empty location"))
                   cb restarter

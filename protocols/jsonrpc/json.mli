@@ -25,7 +25,6 @@ type t =
 
 val string_of_type: t -> string
 
-
 val to_fct_pretty: t -> (string -> unit) -> unit
 val to_string: t -> string
 

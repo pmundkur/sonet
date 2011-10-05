@@ -84,6 +84,8 @@ let is_header_present hdr headers =
   try ignore (lookup_header hdr headers); true
   with Not_found -> false
 
+(* Protocol constants *)
+
 type version =
   | HTTP09
   | HTTP10
@@ -93,6 +95,137 @@ let string_of_version = function
   | HTTP09 -> ""
   | HTTP10 -> "HTTP/1.0"
   | HTTP11 -> "HTTP/1.1"
+
+type meth =
+  | Get
+  | Put
+  | Head
+  | Post
+  | Trace
+  | Delete
+  | Connect
+  | Options
+  | Extension of string
+
+let string_of_meth = function
+  | Get           -> "GET"
+  | Put           -> "PUT"
+  | Head          -> "HEAD"
+  | Post          -> "POST"
+  | Trace         -> "TRACE"
+  | Delete        -> "DELETE"
+  | Connect       -> "CONNECT"
+  | Options       -> "OPTIONS"
+  | Extension m   -> m
+
+type status =
+    (* Informational 1xx *)
+  | Status_continue
+  | Status_switching_protocols
+
+    (* Successful 2xx *)
+  | Status_ok
+  | Status_created
+  | Status_accepted
+  | Status_non_authoritative
+  | Status_no_content
+  | Status_reset_content
+  | Status_partial_content
+
+    (* Redirection 3xx *)
+  | Status_multiple_choices
+  | Status_moved_permanently
+  | Status_found
+  | Status_see_other
+  | Status_not_modified
+  | Status_use_proxy
+  | Status_temporary_redirect
+
+    (* Client Error 4xx *)
+  | Status_bad_request
+  | Status_unauthorized
+  | Status_payment_required
+  | Status_forbidden
+  | Status_not_found
+  | Status_method_not_allowed
+  | Status_not_acceptable
+  | Status_proxy_authentication_required
+  | Status_request_timeout
+  | Status_conflict
+  | Status_gone
+  | Status_length_required
+  | Status_precondition_failed
+  | Status_request_entity_too_large
+  | Status_request_uri_too_large
+  | Status_unsupported_media_type
+  | Status_requested_range_not_satisfiable
+  | Status_expectation_failed
+
+    (* Server Error 5xx *)
+  | Status_internal_server_error
+  | Status_not_implemented
+  | Status_bad_gateway
+  | Status_service_unavailable
+  | Status_gateway_timeout
+  | Status_version_not_supported
+
+    (* Other *)
+  | Status_other of int * string
+
+let status_info = function
+    (* Informational 1xx *)
+  | Status_continue            -> 100, "Continue"
+  | Status_switching_protocols -> 101, "Switching Protocols"
+
+    (* Successful 2xx *)
+  | Status_ok                  -> 200, "Ok"
+  | Status_created             -> 201, "Created"
+  | Status_accepted            -> 202, "Accepted"
+  | Status_non_authoritative   -> 203, "Non-Authoritative Information"
+  | Status_no_content          -> 204, "No Content"
+  | Status_reset_content       -> 205, "Reset Content"
+  | Status_partial_content     -> 206, "Partial Content"
+
+    (* Redirection 3xx *)
+  | Status_multiple_choices    -> 300, "Multiple Choices"
+  | Status_moved_permanently   -> 301, "Moved Permanently"
+  | Status_found               -> 302, "Found"
+  | Status_see_other           -> 303, "See Other"
+  | Status_not_modified        -> 304, "Not Modified"
+  | Status_use_proxy           -> 305, "Use Proxy"
+  | Status_temporary_redirect  -> 307, "Temporary Redirect"
+
+    (* Client Error 4xx *)
+  | Status_bad_request                     -> 400, "Bad Request"
+  | Status_unauthorized                    -> 401, "Unauthorized"
+  | Status_payment_required                -> 402, "Payment Required"
+  | Status_forbidden                       -> 403, "Forbidden"
+  | Status_not_found                       -> 404, "Not Found"
+  | Status_method_not_allowed              -> 405, "Method Not Allowed"
+  | Status_not_acceptable                  -> 406, "Not Acceptable"
+  | Status_proxy_authentication_required   -> 407, "Proxy Authentication Required"
+  | Status_request_timeout                 -> 408, "Request Timeout"
+  | Status_conflict                        -> 409, "Conflict"
+  | Status_gone                            -> 410, "Gone"
+  | Status_length_required                 -> 411, "Length Required"
+  | Status_precondition_failed             -> 412, "Precondition Failed"
+  | Status_request_entity_too_large        -> 413, "Request Entity Too Large"
+  | Status_request_uri_too_large           -> 414, "Request-URI Too Large"
+  | Status_unsupported_media_type          -> 415, "Unsupported Media Type"
+  | Status_requested_range_not_satisfiable -> 416, "Range Not Satisfiable"
+  | Status_expectation_failed              -> 417, "Expectation Failed"
+
+    (* Server Error 5xx *)
+  | Status_internal_server_error           -> 500, "Internal Server Error"
+  | Status_not_implemented                 -> 501, "Not Implemented"
+  | Status_bad_gateway                     -> 502, "Bad Gateway"
+  | Status_service_unavailable             -> 503, "Service Unavailable"
+  | Status_gateway_timeout                 -> 504, "Gateway Timeout"
+  | Status_version_not_supported           -> 505, "HTTP Version Not Supported"
+
+    (* Other *)
+  | Status_other (code, reason)            -> code, reason
+
 
 (* TODO: impose a max length on field names and values *)
 
@@ -223,28 +356,6 @@ end
 
 
 module Request_header = struct
-  type meth =
-    | Get
-    | Put
-    | Head
-    | Post
-    | Trace
-    | Delete
-    | Connect
-    | Options
-    | Extension of string
-
-  let string_of_meth = function
-    | Get           -> "GET"
-    | Put           -> "PUT"
-    | Head          -> "HEAD"
-    | Post          -> "POST"
-    | Trace         -> "TRACE"
-    | Delete        -> "DELETE"
-    | Connect       -> "CONNECT"
-    | Options       -> "OPTIONS"
-    | Extension m   -> m
-
   type url =
     | Star
     | Uri of Uri.t
@@ -475,114 +586,6 @@ end
 
 
 module Response_header = struct
-  type status =
-      (* Informational 1xx *)
-    | Status_continue
-    | Status_switching_protocols
-
-    (* Successful 2xx *)
-    | Status_ok
-    | Status_created
-    | Status_accepted
-    | Status_non_authoritative
-    | Status_no_content
-    | Status_reset_content
-    | Status_partial_content
-
-    (* Redirection 3xx *)
-    | Status_multiple_choices
-    | Status_moved_permanently
-    | Status_found
-    | Status_see_other
-    | Status_not_modified
-    | Status_use_proxy
-    | Status_temporary_redirect
-
-    (* Client Error 4xx *)
-    | Status_bad_request
-    | Status_unauthorized
-    | Status_payment_required
-    | Status_forbidden
-    | Status_not_found
-    | Status_method_not_allowed
-    | Status_not_acceptable
-    | Status_proxy_authentication_required
-    | Status_request_timeout
-    | Status_conflict
-    | Status_gone
-    | Status_length_required
-    | Status_precondition_failed
-    | Status_request_entity_too_large
-    | Status_request_uri_too_large
-    | Status_unsupported_media_type
-    | Status_requested_range_not_satisfiable
-    | Status_expectation_failed
-
-    (* Server Error 5xx *)
-    | Status_internal_server_error
-    | Status_not_implemented
-    | Status_bad_gateway
-    | Status_service_unavailable
-    | Status_gateway_timeout
-    | Status_version_not_supported
-
-    (* Other *)
-    | Status_other of int * string
-
-  let status_info = function
-      (* Informational 1xx *)
-    | Status_continue            -> 100, "Continue"
-    | Status_switching_protocols -> 101, "Switching Protocols"
-
-    (* Successful 2xx *)
-    | Status_ok                  -> 200, "Ok"
-    | Status_created             -> 201, "Created"
-    | Status_accepted            -> 202, "Accepted"
-    | Status_non_authoritative   -> 203, "Non-Authoritative Information"
-    | Status_no_content          -> 204, "No Content"
-    | Status_reset_content       -> 205, "Reset Content"
-    | Status_partial_content     -> 206, "Partial Content"
-
-    (* Redirection 3xx *)
-    | Status_multiple_choices    -> 300, "Multiple Choices"
-    | Status_moved_permanently   -> 301, "Moved Permanently"
-    | Status_found               -> 302, "Found"
-    | Status_see_other           -> 303, "See Other"
-    | Status_not_modified        -> 304, "Not Modified"
-    | Status_use_proxy           -> 305, "Use Proxy"
-    | Status_temporary_redirect  -> 307, "Temporary Redirect"
-
-    (* Client Error 4xx *)
-    | Status_bad_request                     -> 400, "Bad Request"
-    | Status_unauthorized                    -> 401, "Unauthorized"
-    | Status_payment_required                -> 402, "Payment Required"
-    | Status_forbidden                       -> 403, "Forbidden"
-    | Status_not_found                       -> 404, "Not Found"
-    | Status_method_not_allowed              -> 405, "Method Not Allowed"
-    | Status_not_acceptable                  -> 406, "Not Acceptable"
-    | Status_proxy_authentication_required   -> 407, "Proxy Authentication Required"
-    | Status_request_timeout                 -> 408, "Request Timeout"
-    | Status_conflict                        -> 409, "Conflict"
-    | Status_gone                            -> 410, "Gone"
-    | Status_length_required                 -> 411, "Length Required"
-    | Status_precondition_failed             -> 412, "Precondition Failed"
-    | Status_request_entity_too_large        -> 413, "Request Entity Too Large"
-    | Status_request_uri_too_large           -> 414, "Request-URI Too Large"
-    | Status_unsupported_media_type          -> 415, "Unsupported Media Type"
-    | Status_requested_range_not_satisfiable -> 416, "Range Not Satisfiable"
-    | Status_expectation_failed              -> 417, "Expectation Failed"
-
-    (* Server Error 5xx *)
-    | Status_internal_server_error           -> 500, "Internal Server Error"
-    | Status_not_implemented                 -> 501, "Not Implemented"
-    | Status_bad_gateway                     -> 502, "Bad Gateway"
-    | Status_service_unavailable             -> 503, "Service Unavailable"
-    | Status_gateway_timeout                 -> 504, "Gateway Timeout"
-    | Status_version_not_supported           -> 505, "HTTP Version Not Supported"
-
-    (* Other *)
-    | Status_other (code, reason)            -> code, reason
-
   type cursor =
     | Start
     | In_version of char list
@@ -921,7 +924,7 @@ module Payload = struct
 
       match version, meth, content_length, chunked, multipart_body with
         | HTTP09, _, _, _, _
-        | _, Request_header.Connect, _, _, _  -> No_payload
+        | _, Connect, _, _, _  -> No_payload
 
         (* We need to check Transfer-Encoding before Content-Length.
            http://tools.ietf.org/html/rfc2616#section-4.4, Item 3.
@@ -1199,6 +1202,12 @@ module Request = struct
     payload: Payload.t option;
   }
 
+  (* utility accessors *)
+  let version t = t.request.Request_header.version
+  let meth t = t.request.Request_header.meth
+  let headers t = t.request.Request_header.headers
+  let payload_buf t = match t.payload with Some p -> Some p.Payload.content | None -> None
+
   type parse_result =
     | Result of t * (* number of consumed bytes *) int
     | Parse_incomplete of state
@@ -1320,6 +1329,11 @@ module Response = struct
     payload: Payload.t option;
   }
 
+  (* utility accessors *)
+  let status_code t = t.response.Response_header.status_code
+  let headers t = t.response.Response_header.headers
+  let payload_buf t = match t.payload with Some p -> Some p.Payload.content | None -> None
+
   type parse_result =
     | Result of t * (* number of consumed bytes *) int
     | Parse_incomplete of state
@@ -1394,7 +1408,7 @@ module Response = struct
       | None   -> ()
 
   let make_response ?payload ~headers status =
-    let code, reason = Response_header.status_info status in
+    let code, reason = status_info status in
     let payload_length = (match payload with
                             | None -> 0
                             | Some p -> Buffer.length p.Payload.content) in

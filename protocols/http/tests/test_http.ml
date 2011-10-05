@@ -71,7 +71,7 @@ let process_request req =
       Printf.printf "%s" (Buffer.contents buf)
   end else if !show_summary then
     Printf.printf "%s %s\n"
-      (Request_header.string_of_meth req.Request_header.meth)
+      (string_of_meth req.Request_header.meth)
       (Request_header.string_of_url req.Request_header.url)
 
 let process_response resp =
