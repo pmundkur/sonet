@@ -43,12 +43,15 @@ let string_of_error = function
 exception Invalid_request of request
 exception Invalid_url of url * string
 
+type response =
+  | Success of Http.Response.t * (url * error) list
+  | Failure of (url * error) * (url * error) list
+
 type result = {
   request_id : request_id;
   meth : H.meth;
   url : url;
-  response : H.Response.t option;
-  error : (url * error) list option;
+  response : response;
 }
 
 type callback = {
@@ -75,14 +78,21 @@ let defopt def = function
   | None -> def
   | Some v -> v
 
+let make_response cb =
+  match cb.c_response, cb.c_error with
+    | None, Some []
+    | None, None -> assert false
+    | Some r, None -> Success (r, [])
+    | Some r, Some e -> Success (r, e)
+    | None, Some (e :: er) -> Failure (e, er)
+
 let close_conn final cb t =
   if final then begin
     let res = {
       request_id = cb.c_req_id;
       meth = cb.c_meth;
       url = cb.c_url;
-      response = cb.c_response;
-      error = cb.c_error;
+      response = make_response cb
     } in
       cb.c_results :=  res :: !(cb.c_results)
   end;
@@ -264,9 +274,9 @@ let make_connect_callback meth cb_arg = function
          let req = make_file_send_request meth cb_arg.c_url fd cb_arg t in
            Conn.send_request req cb_arg t)
 
-let rec make_conn el cb_funcs
-    ({ c_url = url; c_alternates; c_error } as cb_arg) =
-  let scheme, h, p = scheme_host_port url in
+let make_conn el get_restarter cb_funcs
+    ({ c_url; c_alternates; c_error; c_retries } as cb_arg) =
+  let scheme, h, p = scheme_host_port c_url in
   let port = defopt 80 p in
   let err = (match addr_of_host h scheme with
                | None ->
@@ -275,15 +285,23 @@ let rec make_conn el cb_funcs
                    let addr = Unix.ADDR_INET (a, port) in
                      ignore (Conn.connect el addr cb_funcs);
                      None) in
-    match err, c_alternates with
-      | None, _ ->
-          None
-      | Some e, [] ->
-          let error = Some ((url, e) :: defopt [] c_error) in
-            Some { request_id = cb_arg.c_req_id; meth = cb_arg.c_meth; url; response = None; error }
-      | Some e, c_url :: c_alternates ->
-          let c_error = Some ((url, e) :: (defopt [] c_error)) in
-            make_conn el cb_funcs { cb_arg with c_url; c_alternates; c_error }
+  match err with
+    | None -> `Started
+    | Some e ->
+      (if c_retries <= 0 then
+          let response = Failure ((c_url, e), defopt [] c_error) in
+          `Finished { request_id = cb_arg.c_req_id; meth = cb_arg.c_meth; url = c_url; response }
+       else
+          let c_error = Some ((c_url, e) :: (defopt [] c_error)) in
+          let c_retries = c_retries - 1 in
+          (match c_alternates with
+            | [] ->
+              (* Retry the same url. *)
+              `Retry { cb_arg with c_error; c_retries }
+            | h :: t ->
+              (* Retry with the next alternative. *)
+              `Retry { cb_arg with c_error; c_retries; c_url = h; c_alternates = t @ [ c_url ]}
+          ))
 
 let callbacks_with cb_arg connect_callback get_restarter =
   let restarter = get_restarter () in
@@ -299,9 +317,10 @@ let rec get_restarter () =
 and start_conn el cb_arg =
   let connect_cb = make_connect_callback cb_arg.c_meth cb_arg cb_arg.c_req in
   let cbs = callbacks_with cb_arg connect_cb get_restarter in
-    match make_conn el cbs cb_arg with
-      | None -> ()
-      | Some res -> cb_arg.c_results := res :: !(cb_arg.c_results)
+    match make_conn el get_restarter cbs cb_arg with
+      | `Started -> ()
+      | `Retry retry_arg -> start_conn el retry_arg
+      | `Finished res -> cb_arg.c_results := res :: !(cb_arg.c_results)
 
 let start_requests el retry_rounds requests =
   let results = ref [] in

@@ -38,12 +38,15 @@ exception Invalid_url of url * string
 
 val is_supported_url : url -> bool
 
+type response =
+  | Success of Http.Response.t * (url * error) list
+  | Failure of (url * error) * (url * error) list
+
 type result = {
   request_id : request_id;
   meth : Http.meth;
   url : url;
-  response : Http.Response.t option;
-  error : (url * error) list option;
+  response : response;
 }
 
 val request : ?retry_rounds:int -> (meth * request * request_id) list -> result list

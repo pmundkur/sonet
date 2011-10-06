@@ -43,13 +43,14 @@ let funopt f = function
 let show_result verbose r =
   Printf.printf "\n%s %s: " (H.string_of_meth r.Client.meth) r.Client.url;
   (match r.Client.response with
-    | None ->
-      Printf.printf "No response\n"
-    | Some resp ->
+    | Client.Failure (one, rest) ->
+      Printf.printf "No response\n";
+      errmsg one; List.iter errmsg rest
+    | Client.Success (resp, errs) ->
       Printf.printf "Response received\n";
       if verbose || r.Client.meth = H.Head then Printf.printf "%s\n" (string_of_resp resp);
-  );
-  funopt (fun el -> List.iter errmsg el) r.Client.error
+      List.iter errmsg errs
+  )
 
 let rec show_results verbose = function
   | [] -> ()
@@ -127,7 +128,8 @@ let run () =
               | "-h" | "--help" ->
                 print_usage ()
               | "-p" | "--payload" ->
-                verbose := true
+                verbose := true;
+                process_args (indx + 1)
               | _ ->
                 Printf.printf "Unrecognized option: %s\n" opt;
                 print_usage ()
