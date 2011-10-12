@@ -33,11 +33,13 @@ type request_id = int
 type error =
   | Unix of Unix.error
   | Http of (* status code *) int * string
+  | Inactive_connection
   | Other of string
 
 let string_of_error = function
   | Unix e -> Unix.error_message e
   | Http (sc, m) -> Printf.sprintf "HTTP status %d: %s" sc m
+  | Inactive_connection -> Printf.sprintf "Inactive connection"
   | Other m -> m
 
 exception Invalid_request of request
@@ -62,6 +64,8 @@ type callback = {
   c_url : url;
   c_alternates : url list;
   c_retries : int;
+  c_activity : bool ref;
+  c_timer : Eventloop.timer option ref;
   c_results : result list ref;
   c_response : H.Response.t option;
   c_error : (url * error) list option;
@@ -94,8 +98,15 @@ let close_conn final cb t =
       url = cb.c_url;
       response = make_response cb
     } in
-      cb.c_results :=  res :: !(cb.c_results)
+    cb.c_results :=  res :: !(cb.c_results)
   end;
+  (match !(cb.c_timer) with
+    | Some th ->
+      Eventloop.cancel_timer (Conn.get_eventloop t) th;
+      cb.c_timer := None
+    | None ->
+      ()
+  );
   Conn.close t
 
 let file_receiver fd cb t s o l f =
@@ -239,8 +250,9 @@ let reset_fileofs { c_req; c_fdofs } =
 
 let make_callback_arg c_meth c_req c_req_id c_url c_alternates c_retries c_results =
   let c_fdofs = fileofs_of_req c_req in
-    { c_req; c_req_id; c_meth; c_fdofs; c_url; c_alternates; c_retries; c_results;
-      c_response = None; c_error = None }
+    { c_req; c_req_id; c_meth; c_fdofs; c_url; c_alternates;
+      c_retries; c_activity = ref false; c_timer = ref None;
+      c_results; c_response = None; c_error = None }
 
 let content_length_hdr_of_fd fd =
   try [("Content-Length", [string_of_int (U.fstat fd).U.st_size])]
@@ -274,6 +286,22 @@ let make_connect_callback meth cb_arg = function
          let req = make_file_send_request meth cb_arg.c_url fd cb_arg t in
            Conn.send_request req cb_arg t)
 
+let dEFAULT_INACTIVITY_DURATION = 60.0 (* seconds *)
+
+let rec start_conn_timer ?(duration = dEFAULT_INACTIVITY_DURATION) el t cb =
+  assert (!(cb.c_timer) = None);
+  cb.c_activity := false;
+  let timer () =
+    cb.c_timer := None;
+    if !(cb.c_activity) then
+      start_conn_timer el t cb
+    else
+      let cb = { cb with c_error = Some ((cb.c_url, Inactive_connection) :: defopt [] cb.c_error) } in
+      (* For now, don't retry connections after a timeout. *)
+      close_conn true cb t
+  in
+  cb.c_timer := Some (Eventloop.start_timer el duration timer)
+
 let make_conn el get_restarter cb_funcs
     ({ c_url; c_alternates; c_error; c_retries } as cb_arg) =
   let scheme, h, p = scheme_host_port c_url in
@@ -283,8 +311,9 @@ let make_conn el get_restarter cb_funcs
                    Some (Other ("Unable to resolve " ^ h))
                | Some a ->
                    let addr = Unix.ADDR_INET (a, port) in
-                     ignore (Conn.connect el addr cb_funcs);
-                     None) in
+                   let t = Conn.connect el addr cb_funcs in
+                   start_conn_timer el t cb_arg;
+                   None) in
   match err with
     | None -> `Started
     | Some e ->
@@ -304,11 +333,14 @@ let make_conn el get_restarter cb_funcs
           ))
 
 let callbacks_with cb_arg connect_callback get_restarter =
+  let activity_wrapper f x =
+    cb_arg.c_activity := true;
+    f x in
   let restarter = get_restarter () in
-    { Conn.connect_callback = connect_callback;
-      response_callback = response_callback restarter;
-      shutdown_callback = shutdown_callback restarter cb_arg;
-      error_callback = error_callback restarter cb_arg }
+  { Conn.connect_callback = activity_wrapper connect_callback;
+    response_callback = activity_wrapper (response_callback restarter);
+    shutdown_callback = activity_wrapper (shutdown_callback restarter cb_arg);
+    error_callback = activity_wrapper (error_callback restarter cb_arg) }
 
 let rec get_restarter () =
   (fun el cb_arg ->
@@ -318,9 +350,9 @@ and start_conn el cb_arg =
   let connect_cb = make_connect_callback cb_arg.c_meth cb_arg cb_arg.c_req in
   let cbs = callbacks_with cb_arg connect_cb get_restarter in
     match make_conn el get_restarter cbs cb_arg with
-      | `Started -> ()
+      | `Started         -> ()
       | `Retry retry_arg -> start_conn el retry_arg
-      | `Finished res -> cb_arg.c_results := res :: !(cb_arg.c_results)
+      | `Finished res    -> cb_arg.c_results := res :: !(cb_arg.c_results)
 
 let start_requests el retry_rounds requests =
   let results = ref [] in
@@ -349,6 +381,6 @@ let request ?retry_rounds reqs =
   let el = Eventloop.create () in
   let results_ref = start_requests el (defopt dEFAULT_RETRY_ROUNDS retry_rounds) reqs in
     while Eventloop.has_connections el || Eventloop.has_timers el do
-      Eventloop.dispatch el 1.0
+      Eventloop.dispatch el 10.0
     done;
     !results_ref

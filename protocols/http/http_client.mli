@@ -29,6 +29,7 @@ type request_id = int
 type error =
   | Unix of Unix.error
   | Http of (* status code *) int * string
+  | Inactive_connection
   | Other of string
 
 val string_of_error : error -> string
