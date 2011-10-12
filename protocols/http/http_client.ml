@@ -109,13 +109,16 @@ let close_conn final cb t =
   );
   Conn.close t
 
+let update_error cb err =
+  { cb with c_error = Some ((cb.c_url, err) :: defopt [] cb.c_error) }
+
 let file_receiver fd cb t s o l f =
   try
     ignore (Unix.write fd s o l)
   with
     | Unix.Unix_error (e, _, _) ->
-        let cb = { cb with c_error = Some ((cb.c_url, Unix e) :: defopt [] cb.c_error) }
-        in close_conn true cb t
+        let cb = update_error cb (Unix e) in
+        close_conn true cb t
 
 let file_sender fd buffer cb t () =
   try
@@ -123,13 +126,12 @@ let file_sender fd buffer cb t () =
       (nbytes = 0), buffer, 0, nbytes
   with
     | Unix.Unix_error (e, _, _) ->
-        let cb = { cb with c_error = Some ((cb.c_url, Unix e) :: defopt [] cb.c_error) } in
+        let cb = update_error cb (Unix e) in
         close_conn true cb t;
         true, buffer, 0, 0
 
 let restart_after_error t e cb restarter =
   let c_retries = cb.c_retries - 1 in
-  let c_error = Some ((cb.c_url, e) :: defopt [] cb.c_error) in
   let do_restart cb =
     let el = Conn.get_eventloop t in
       close_conn false cb t;
@@ -137,7 +139,7 @@ let restart_after_error t e cb restarter =
   in
     match cb with
       | { c_retries } when c_retries <= 0 ->
-          close_conn true { cb with c_error } t
+          close_conn true (update_error cb e) t
       | { c_alternates = [] } ->
           (* Retry the same url. *)
           do_restart { cb with c_retries }
@@ -296,7 +298,7 @@ let rec start_conn_timer ?(duration = dEFAULT_INACTIVITY_DURATION) el t cb =
     if !(cb.c_activity) then
       start_conn_timer el t cb
     else
-      let cb = { cb with c_error = Some ((cb.c_url, Inactive_connection) :: defopt [] cb.c_error) } in
+      let cb = update_error cb Inactive_connection in
       (* For now, don't retry connections after a timeout. *)
       close_conn true cb t
   in
@@ -321,15 +323,15 @@ let make_conn el get_restarter cb_funcs
           let response = Failure ((c_url, e), defopt [] c_error) in
           `Finished { request_id = cb_arg.c_req_id; meth = cb_arg.c_meth; url = c_url; response }
        else
-          let c_error = Some ((c_url, e) :: (defopt [] c_error)) in
+          let cb = update_error cb_arg e in
           let c_retries = c_retries - 1 in
           (match c_alternates with
             | [] ->
               (* Retry the same url. *)
-              `Retry { cb_arg with c_error; c_retries }
+              `Retry { cb with c_retries }
             | h :: t ->
               (* Retry with the next alternative. *)
-              `Retry { cb_arg with c_error; c_retries; c_url = h; c_alternates = t @ [ c_url ]}
+              `Retry { cb with c_retries; c_url = h; c_alternates = t @ [ c_url ]}
           ))
 
 let callbacks_with cb_arg connect_callback get_restarter =
