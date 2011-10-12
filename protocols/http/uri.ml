@@ -150,13 +150,17 @@ let parse_authority s =
   in
   let auth_regexp = Str.regexp auth_re in
     if Str.string_match auth_regexp s 0 then
-      let ret = Some { userinfo = get_opt_group 2;
-                       host     = Str.matched_group 3 s;
-                       port     = get_opt_port ();
-                     }
-      in
-        if ret = Some { userinfo = None; host = ""; port = None }
-        then None else ret
+      (* check if the match is entire *)
+      if Str.matched_string s = s then
+        let ret = Some { userinfo = get_opt_group 2;
+                         host     = Str.matched_group 3 s;
+                         port     = get_opt_port ();
+                       }
+        in
+          if ret = Some { userinfo = None; host = ""; port = None }
+          then None else ret
+      else (* if the match is not entire, use the entire string as host *)
+        Some { userinfo = None; host = s; port = None }
     else None
 
 (* The following regular expression and explanation is taken from
