@@ -176,6 +176,8 @@ let to_object_table j =
     | Json.Object a -> Array.to_list a
     | _ -> raise_unexpected_json_type (Json.string_of_type j) "object"
 
+let object_table_to_list j = j
+
 let object_field t f =
   try List.assoc f t
   with Not_found -> raise_missing_object_field f

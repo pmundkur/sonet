@@ -52,6 +52,7 @@ val to_list: Json.t -> Json.t list
 
 type object_table
 val to_object_table: Json.t -> object_table
+val object_table_to_list: object_table -> (string * Json.t) list
 val object_field: object_table -> string -> Json.t
 val optional_object_field: object_table -> string -> Json.t
 val has_object_field: object_table -> string -> bool
