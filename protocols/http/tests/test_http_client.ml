@@ -29,16 +29,12 @@ let string_of_req = function
   | Client.FileRecv (_, _) -> "download"
   | Client.FileSend (_, _) -> "upload"
 
-let errmsg (u, e) =
-  let em = match e with
-    | Client.Unix e -> Unix.error_message e
-    | Client.Http (s, m) -> Printf.sprintf "HTTP status %d: %s" s m
-    | Client.Other m -> m
-  in Printf.printf "\t%s: %s\n" u em
-
 let funopt f = function
   | None -> ()
   | Some e -> f e
+
+let errmsg (u, e) =
+  Printf.printf "\t%s: %s\n" u (Client.string_of_error e)
 
 let show_result verbose r =
   Printf.printf "\n%s %s: " (H.string_of_meth r.Client.meth) r.Client.url;
