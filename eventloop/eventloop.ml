@@ -330,7 +330,9 @@ let dispatch t interval =
         then first_expiry
         else block_until in
       let interval = block_until -. t.current_time in
-        if interval < 0.0 then 0.0 else interval
+        (* note: setting the interval to 0.0 is equivalent to blocking
+           forever; instead use a small epsilon.  *)
+      if interval < 0.0 then 0.01 else interval
   in
   let opt_events =
     try Some (t.poller.Net_events.get_events interval)
@@ -362,6 +364,7 @@ let dispatch t interval =
         | Some cs, Net_events.Error (ec, f, s) ->
             cs.callbacks.error_callback t fd (ec, f, s)
   in
+    t.current_time <- Unix.gettimeofday ();
     (match opt_events with
        | Some events ->
            t.cur_events <- events;
