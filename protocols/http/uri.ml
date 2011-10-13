@@ -254,13 +254,11 @@ let of_string s = parse_uri s
 (* See Section 5.3 of RFC 3986. *)
 let authority_to_string u =
   match u.authority with
-    | None -> ""
-    | Some a ->
-        let mod_host =
-          (match a.userinfo with | None -> a.host | Some u -> u ^ "@" ^ a.host)
-        in (match a.port with
-              | None -> mod_host
-              | Some p -> mod_host ^ ":" ^ string_of_int p)
+    | None                                            -> ""
+    | Some { userinfo = None;   host; port = None }   -> host
+    | Some { userinfo = None;   host; port = Some p } -> Printf.sprintf "%s:%d"    host p
+    | Some { userinfo = Some u; host; port = None }   -> Printf.sprintf "%s@%s"    u host
+    | Some { userinfo = Some u; host; port = Some p } -> Printf.sprintf "%s@%s:%d" u host p
 
 let abspath_to_string u =
   let path =
