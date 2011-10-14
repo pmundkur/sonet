@@ -82,81 +82,81 @@ let defopt def = function
   | None -> def
   | Some v -> v
 
-let make_response cb =
-  match cb.c_response, cb.c_error with
+let make_response cba =
+  match cba.c_response, cba.c_error with
     | None, Some []
     | None, None -> assert false
     | Some r, None -> Success (r, [])
     | Some r, Some e -> Success (r, e)
     | None, Some (e :: er) -> Failure (e, er)
 
-let close_conn final cb t =
+let close_conn final cba t =
   if final then begin
     let res = {
-      request_id = cb.c_req_id;
-      meth = cb.c_meth;
-      url = cb.c_url;
-      response = make_response cb
+      request_id = cba.c_req_id;
+      meth = cba.c_meth;
+      url = cba.c_url;
+      response = make_response cba
     } in
-    cb.c_results :=  res :: !(cb.c_results)
+    cba.c_results :=  res :: !(cba.c_results)
   end;
-  (match !(cb.c_timer) with
+  (match !(cba.c_timer) with
     | Some th ->
       Eventloop.cancel_timer (Conn.get_eventloop t) th;
-      cb.c_timer := None
+      cba.c_timer := None
     | None ->
       ()
   );
   Conn.close t
 
-let update_error cb err =
-  { cb with c_error = Some ((cb.c_url, err) :: defopt [] cb.c_error) }
+let update_error cba err =
+  { cba with c_error = Some ((cba.c_url, err) :: defopt [] cba.c_error) }
 
-let file_receiver fd cb t s o l f =
+let file_receiver fd cba t s o l f =
   try
     ignore (Unix.write fd s o l)
   with
     | Unix.Unix_error (e, _, _) ->
-        let cb = update_error cb (Unix e) in
-        close_conn true cb t
+        let cba = update_error cba (Unix e) in
+        close_conn true cba t
 
-let file_sender fd buffer cb t () =
+let file_sender fd buffer cba t () =
   try
     let nbytes = Unix.read fd buffer 0 (String.length buffer) in
       (nbytes = 0), buffer, 0, nbytes
   with
     | Unix.Unix_error (e, _, _) ->
-        let cb = update_error cb (Unix e) in
-        close_conn true cb t;
+        let cba = update_error cba (Unix e) in
+        close_conn true cba t;
         true, buffer, 0, 0
 
-let restart_after_error t e cb restarter =
-  let c_retries = cb.c_retries - 1 in
-  let do_restart cb =
+let restart_after_error t e cba restarter =
+  let c_retries = cba.c_retries - 1 in
+  let do_restart cba =
     let el = Conn.get_eventloop t in
-      close_conn false cb t;
-      restarter el cb
+      close_conn false cba t;
+      restarter el cba
   in
-    match cb with
+    match cba with
       | { c_retries } when c_retries <= 0 ->
-          close_conn true (update_error cb e) t
+          close_conn true (update_error cba e) t
       | { c_alternates = [] } ->
           (* Retry the same url. *)
-          do_restart { cb with c_retries }
+          do_restart { cba with c_retries }
       | { c_url; c_alternates = h :: t } ->
           (* Retry with the next alternative. *)
-          do_restart { cb with c_url = h; c_alternates = t @ [ c_url ]; c_retries }
+          do_restart { cba with c_url = h; c_alternates = t @ [ c_url ]; c_retries }
 
-let response_callback restarter cb t resp =
-  assert (cb.c_response = None);
+let response_callback restarter cba t resp =
+  assert (cba.c_response = None);
   let status = H.Response.status_code resp in
     if status >= 200 && status < 299 then begin
-      close_conn true { cb with c_response = Some resp } t
+      close_conn true { cba with c_response = Some resp } t
     end else if status = 503 then begin
       (* Server is overloaded; try an alternative. If there is only
          one alternative, it would be nicer to use a timer. *)
-      close_conn false cb t;
-      restart_after_error t (Http (status, "Server busy")) cb restarter
+      close_conn false cba t;
+      restart_after_error t (Http (status, "Server busy")) cba restarter
     end else if status = 300 or status = 301 or status = 302 then begin
       (* Perform redirection.  303 is not currently handled, and will
          be treated like an error. *)
@@ -165,31 +165,31 @@ let response_callback restarter cb t resp =
           match H.lookup_header "Location" headers with
             | [] ->
                 restart_after_error t (Http (status, "HTTP redirect with empty location"))
-                  cb restarter
+                  cba restarter
             | l :: _ ->
                 (* Redirect without logging an error *)
-                let new_cb = { cb with c_url = l } in
+                let new_cba = { cba with c_url = l } in
                 let el = Conn.get_eventloop t in
-                  close_conn false cb t;
-                  restarter el new_cb
+                  close_conn false cba t;
+                  restarter el new_cba
         with Not_found ->
           restart_after_error t (Http (status, "HTTP redirect with no location"))
-            cb restarter
+            cba restarter
     end else
-      restart_after_error t (Http (status, "Unexpected response")) cb restarter
+      restart_after_error t (Http (status, "Unexpected response")) cba restarter
 
-let shutdown_callback restarter cb t =
+let shutdown_callback restarter cba t =
   (* If we'd received a complete response, we would have received a
      response_callback by now, so getting this callback is equivalent
      to an error callback.  *)
-  assert (cb.c_response = None);
-  restart_after_error t (Other "connection shutdown") cb restarter
+  assert (cba.c_response = None);
+  restart_after_error t (Other "connection shutdown") cba restarter
 
-let error_callback restarter cb t e =
+let error_callback restarter cba t e =
   let err = (match e with
                | Conn.Error_eventloop (e, _, _) -> Unix e
                | Conn.Error_http (_, m) -> Other m) in
-    restart_after_error t err cb restarter
+    restart_after_error t err cba restarter
 
 let scheme_host_port url =
   let uri = Uri.of_string url in
@@ -264,44 +264,44 @@ let content_length_hdr_of_payload = function
   | None -> [("Content-Length", ["0"])]
   | Some s -> [("Content-Length", [string_of_int (String.length s)])]
 
-let make_file_recv_request meth url fd cb t =
-  let prcb = file_receiver fd cb t in
+let make_file_recv_request meth url fd cba t =
+  let prcb = file_receiver fd cba t in
     C.StreamingRecv ((req_of (reqhdr_of meth url []) None), prcb)
 
-let make_file_send_request meth url fd cb t =
-  let pscb = file_sender fd (String.create 8048) cb t in
+let make_file_send_request meth url fd cba t =
+  let pscb = file_sender fd (String.create 8048) cba t in
   let cl_hdr = content_length_hdr_of_fd fd in
     C.StreamingSend ((reqhdr_of meth url cl_hdr), pscb)
 
-let make_connect_callback meth cb_arg = function
+let make_connect_callback meth cba = function
   | Payload (_, payload_opt) ->
       let cl_hdr = content_length_hdr_of_payload payload_opt in
-      let reqhdr = reqhdr_of meth cb_arg.c_url cl_hdr in
+      let reqhdr = reqhdr_of meth cba.c_url cl_hdr in
       let req = C.Small (req_of reqhdr payload_opt) in
-        Conn.send_request req cb_arg
+        Conn.send_request req cba
   | FileRecv (_, fd) ->
       (fun t ->
-         let req = make_file_recv_request meth cb_arg.c_url fd cb_arg t in
-           Conn.send_request req cb_arg t)
+         let req = make_file_recv_request meth cba.c_url fd cba t in
+           Conn.send_request req cba t)
   | FileSend (_, fd) ->
       (fun t ->
-         let req = make_file_send_request meth cb_arg.c_url fd cb_arg t in
-           Conn.send_request req cb_arg t)
+         let req = make_file_send_request meth cba.c_url fd cba t in
+           Conn.send_request req cba t)
 
 let dEFAULT_INACTIVITY_DURATION = 60.0 (* seconds *)
 
-let rec start_conn_timer ?(duration = dEFAULT_INACTIVITY_DURATION) restarter el t cb =
-  assert (!(cb.c_timer) = None);
-  cb.c_activity := false;
+let rec start_conn_timer ?(duration = dEFAULT_INACTIVITY_DURATION) restarter el t cba =
+  assert (!(cba.c_timer) = None);
+  cba.c_activity := false;
   let timer () =
-    cb.c_timer := None;
-    if !(cb.c_activity) then start_conn_timer restarter el t cb
-    else restart_after_error t Inactive_connection cb restarter
+    cba.c_timer := None;
+    if !(cba.c_activity) then start_conn_timer restarter el t cba
+    else restart_after_error t Inactive_connection cba restarter
   in
-  cb.c_timer := Some (Eventloop.start_timer el duration timer)
+  cba.c_timer := Some (Eventloop.start_timer el duration timer)
 
 let make_conn el get_restarter cb_funcs
-    ({ c_url; c_alternates; c_error; c_retries } as cb_arg) =
+    ({ c_url; c_alternates; c_error; c_retries } as cba) =
   let scheme, h, p = scheme_host_port c_url in
   let port = defopt 80 p in
   let err = (match addr_of_host h scheme with
@@ -310,47 +310,47 @@ let make_conn el get_restarter cb_funcs
                | Some a ->
                    let addr = Unix.ADDR_INET (a, port) in
                    let t = Conn.connect el addr cb_funcs in
-                   start_conn_timer (get_restarter ()) el t cb_arg;
+                   start_conn_timer (get_restarter ()) el t cba;
                    None) in
   match err with
     | None -> `Started
     | Some e ->
       (if c_retries <= 0 then
           let response = Failure ((c_url, e), defopt [] c_error) in
-          `Finished { request_id = cb_arg.c_req_id; meth = cb_arg.c_meth; url = c_url; response }
+          `Finished { request_id = cba.c_req_id; meth = cba.c_meth; url = c_url; response }
        else
-          let cb = update_error cb_arg e in
+          let cba = update_error cba e in
           let c_retries = c_retries - 1 in
           (match c_alternates with
             | [] ->
               (* Retry the same url. *)
-              `Retry { cb with c_retries }
+              `Retry { cba with c_retries }
             | h :: t ->
               (* Retry with the next alternative. *)
-              `Retry { cb with c_retries; c_url = h; c_alternates = t @ [ c_url ]}
+              `Retry { cba with c_retries; c_url = h; c_alternates = t @ [ c_url ]}
           ))
 
-let callbacks_with cb_arg connect_callback get_restarter =
+let callbacks_with cba connect_callback get_restarter =
   let activity_wrapper f x =
-    cb_arg.c_activity := true;
+    cba.c_activity := true;
     f x in
   let restarter = get_restarter () in
   { Conn.connect_callback = activity_wrapper connect_callback;
     response_callback = activity_wrapper (response_callback restarter);
-    shutdown_callback = activity_wrapper (shutdown_callback restarter cb_arg);
-    error_callback = activity_wrapper (error_callback restarter cb_arg) }
+    shutdown_callback = activity_wrapper (shutdown_callback restarter cba);
+    error_callback = activity_wrapper (error_callback restarter cba) }
 
 let rec get_restarter () =
-  (fun el cb_arg ->
-     reset_fileofs cb_arg;
-     start_conn el cb_arg)
-and start_conn el cb_arg =
-  let connect_cb = make_connect_callback cb_arg.c_meth cb_arg cb_arg.c_req in
-  let cbs = callbacks_with cb_arg connect_cb get_restarter in
-    match make_conn el get_restarter cbs cb_arg with
+  (fun el cba ->
+     reset_fileofs cba;
+     start_conn el cba)
+and start_conn el cba =
+  let connect_cb = make_connect_callback cba.c_meth cba cba.c_req in
+  let cbs = callbacks_with cba connect_cb get_restarter in
+    match make_conn el get_restarter cbs cba with
       | `Started         -> ()
       | `Retry retry_arg -> start_conn el retry_arg
-      | `Finished res    -> cb_arg.c_results := res :: !(cb_arg.c_results)
+      | `Finished res    -> cba.c_results := res :: !(cba.c_results)
 
 let start_requests el retry_rounds requests =
   let results = ref [] in
@@ -362,8 +362,8 @@ let start_requests el retry_rounds requests =
           (* We've ensured that there is at least one url *)
           match urls_of_req req with [] -> assert false | hd :: tl -> hd, tl in
         let retries = retry_rounds * (1 + List.length alternates) in
-        let cb_arg = make_callback_arg meth req req_id url alternates retries results in
-          start_conn el cb_arg;
+        let cba = make_callback_arg meth req req_id url alternates retries results in
+          start_conn el cba;
           starter rest
   in
     starter requests;
