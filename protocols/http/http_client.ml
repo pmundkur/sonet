@@ -290,17 +290,13 @@ let make_connect_callback meth cb_arg = function
 
 let dEFAULT_INACTIVITY_DURATION = 60.0 (* seconds *)
 
-let rec start_conn_timer ?(duration = dEFAULT_INACTIVITY_DURATION) el t cb =
+let rec start_conn_timer ?(duration = dEFAULT_INACTIVITY_DURATION) restarter el t cb =
   assert (!(cb.c_timer) = None);
   cb.c_activity := false;
   let timer () =
     cb.c_timer := None;
-    if !(cb.c_activity) then
-      start_conn_timer el t cb
-    else
-      let cb = update_error cb Inactive_connection in
-      (* For now, don't retry connections after a timeout. *)
-      close_conn true cb t
+    if !(cb.c_activity) then start_conn_timer restarter el t cb
+    else restart_after_error t Inactive_connection cb restarter
   in
   cb.c_timer := Some (Eventloop.start_timer el duration timer)
 
@@ -314,7 +310,7 @@ let make_conn el get_restarter cb_funcs
                | Some a ->
                    let addr = Unix.ADDR_INET (a, port) in
                    let t = Conn.connect el addr cb_funcs in
-                   start_conn_timer el t cb_arg;
+                   start_conn_timer (get_restarter ()) el t cb_arg;
                    None) in
   match err with
     | None -> `Started
