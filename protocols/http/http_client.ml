@@ -288,19 +288,17 @@ let make_connect_callback meth cba = function
          let req = make_file_send_request meth cba.c_url fd cba t in
            Conn.send_request req cba t)
 
-let dEFAULT_INACTIVITY_DURATION = 60.0 (* seconds *)
-
-let rec start_conn_timer ?(duration = dEFAULT_INACTIVITY_DURATION) restarter el t cba =
+let rec start_conn_timer timeout restarter el t cba =
   assert (!(cba.c_timer) = None);
   cba.c_activity := false;
   let timer () =
     cba.c_timer := None;
-    if !(cba.c_activity) then start_conn_timer restarter el t cba
+    if !(cba.c_activity) then start_conn_timer timeout restarter el t cba
     else restart_after_error t Inactive_connection cba restarter
   in
-  cba.c_timer := Some (Eventloop.start_timer el duration timer)
+  cba.c_timer := Some (Eventloop.start_timer el timeout timer)
 
-let make_conn el get_restarter cb_funcs
+let make_conn timeout el restarter cb_funcs
     ({ c_url; c_alternates; c_error; c_retries } as cba) =
   let scheme, h, p = scheme_host_port c_url in
   let port = defopt 80 p in
@@ -310,7 +308,7 @@ let make_conn el get_restarter cb_funcs
                | Some a ->
                    let addr = Unix.ADDR_INET (a, port) in
                    let t = Conn.connect el addr cb_funcs in
-                   start_conn_timer (get_restarter ()) el t cba;
+                   start_conn_timer timeout restarter el t cba;
                    None) in
   match err with
     | None -> `Started
@@ -330,29 +328,28 @@ let make_conn el get_restarter cb_funcs
               `Retry { cba with c_retries; c_url = h; c_alternates = t @ [ c_url ]}
           ))
 
-let callbacks_with cba connect_callback get_restarter =
+let callbacks_with cba connect_callback restarter =
   let activity_wrapper f x =
     cba.c_activity := true;
     f x in
-  let restarter = get_restarter () in
   { Conn.connect_callback = activity_wrapper connect_callback;
     response_callback = activity_wrapper (response_callback restarter);
     shutdown_callback = activity_wrapper (shutdown_callback restarter cba);
     error_callback = activity_wrapper (error_callback restarter cba) }
 
-let rec get_restarter () =
+let rec get_restarter timeout =
   (fun el cba ->
      reset_fileofs cba;
-     start_conn el cba)
-and start_conn el cba =
+     start_conn timeout el cba)
+and start_conn timeout el cba =
   let connect_cb = make_connect_callback cba.c_meth cba cba.c_req in
-  let cbs = callbacks_with cba connect_cb get_restarter in
-    match make_conn el get_restarter cbs cba with
+  let cbs = callbacks_with cba connect_cb (get_restarter timeout) in
+    match make_conn timeout el (get_restarter timeout) cbs cba with
       | `Started         -> ()
-      | `Retry retry_arg -> start_conn el retry_arg
+      | `Retry retry_arg -> start_conn timeout el retry_arg
       | `Finished res    -> cba.c_results := res :: !(cba.c_results)
 
-let start_requests el retry_rounds requests =
+let start_requests timeout retry_rounds el requests =
   let results = ref [] in
   let rec starter = function
     | [] ->
@@ -363,22 +360,25 @@ let start_requests el retry_rounds requests =
           match urls_of_req req with [] -> assert false | hd :: tl -> hd, tl in
         let retries = retry_rounds * (1 + List.length alternates) in
         let cba = make_callback_arg meth req req_id url alternates retries results in
-          start_conn el cba;
+          start_conn timeout el cba;
           starter rest
   in
     starter requests;
     results
 
 let dEFAULT_RETRY_ROUNDS = 2
+let dEFAULT_INACTIVITY_TIMEOUT = 30.0 (* seconds *)
 
-let request ?retry_rounds reqs =
+let request ?retry_rounds ?timeout reqs =
+  let time_out = defopt dEFAULT_INACTIVITY_TIMEOUT timeout in
+  let retries = defopt dEFAULT_RETRY_ROUNDS retry_rounds in
   (* Sanity check the requests to ensure at least one url *)
   let () = List.iter (fun (_m, r, _ri) ->
                         if urls_of_req r = [] then raise (Invalid_request r)
                      ) reqs in
   let el = Eventloop.create () in
-  let results_ref = start_requests el (defopt dEFAULT_RETRY_ROUNDS retry_rounds) reqs in
-    while Eventloop.has_connections el || Eventloop.has_timers el do
-      Eventloop.dispatch el 10.0
-    done;
-    !results_ref
+  let results_ref = start_requests time_out retries el reqs in
+  while Eventloop.has_connections el || Eventloop.has_timers el do
+    Eventloop.dispatch el 10.0
+  done;
+  !results_ref

@@ -50,4 +50,5 @@ type result = {
   response : response;
 }
 
-val request : ?retry_rounds:int -> (meth * request * request_id) list -> result list
+val request : (?retry_rounds:int -> ?timeout:float
+               -> (meth * request * request_id) list -> result list)
