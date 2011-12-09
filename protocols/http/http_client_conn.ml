@@ -23,16 +23,16 @@ module H = Http
 
 module type CallbackType = sig type t end
 
-  type payload_send_callback = unit -> bool * string * int * int
-  type payload_recv_callback = H.payload_callback
+type payload_send_callback = unit -> bool * string * int * int
+type payload_recv_callback = H.payload_callback
 
-  type request =
-    | Small of H.Request.t
-    | StreamingSend of H.Request_header.t * payload_send_callback
-    | StreamingRecv of H.Request.t * payload_recv_callback
-    | Streaming of (H.Request_header.t
-                    * payload_send_callback
-                    * payload_recv_callback)
+type request =
+  | Small of H.Request.t
+  | StreamingSend of H.Request_header.t * payload_send_callback
+  | StreamingRecv of H.Request.t * payload_recv_callback
+  | Streaming of (H.Request_header.t
+                  * payload_send_callback
+                  * payload_recv_callback)
 
 module type Conn =
 sig
