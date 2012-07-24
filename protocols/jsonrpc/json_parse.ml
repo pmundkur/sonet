@@ -550,9 +550,9 @@ let finish_parse state =
 
 let num_chars_parsed state = state.num_chars_parsed
 
-(* convenience function *)
-let of_string str =
-  match parse (init_parse_state ()) str with
+(* convenience functions *)
+let of_substring str ofs len =
+  match parse_substring (init_parse_state ()) str ofs len with
     | Json_value (v, _) ->
         v
     | Json_parse_incomplete st ->
@@ -560,3 +560,6 @@ let of_string str =
            | Some v -> v
            | None -> raise_unterminated_value st (current_cursor_value st.cursor)
         )
+
+let of_string str =
+  of_substring str 0 (String.length str)

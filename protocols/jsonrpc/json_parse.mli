@@ -39,5 +39,6 @@ val string_of_error: error -> string
 
 exception Parse_error of error
 
-(* convenience function *)
+(* convenience functions *)
 val of_string: string -> Json.t
+val of_substring: string -> (* offset *) int -> (* length *) int -> Json.t
