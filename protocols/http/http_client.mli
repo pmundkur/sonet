@@ -1,6 +1,6 @@
 (**************************************************************************)
 (*                                                                        *)
-(*  Copyright (C) 2010, 2011  Prashanth Mundkur.                          *)
+(*  Copyright (C) 2010-2012  Prashanth Mundkur.                           *)
 (*  Author  Prashanth Mundkur <prashanth.mundkur _at_ gmail.com>          *)
 (*                                                                        *)
 (*  This program is free software; you can redistribute it and/or         *)
@@ -15,16 +15,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type meth = Http.meth
 type url = string
 type payload = string
-
-type request =
-  | Payload of url list * payload option
-  | FileRecv of url list * Unix.file_descr
-  | FileSend of url list * Unix.file_descr
-
-type request_id = int
 
 type error =
   | Unix of Unix.error
@@ -34,21 +26,34 @@ type error =
 
 val string_of_error : error -> string
 
-exception Invalid_request of request
 exception Invalid_url of url * string
+exception Invalid_request of string
 
 val is_supported_url : url -> bool
+
+type request =
+  | Payload of url list * payload option
+  | FileRecv of url list * Unix.file_descr
+  | FileSend of url list * Unix.file_descr
 
 type response =
   | Success of Http.Response.t * (url * error) list
   | Failure of (url * error) * (url * error) list
 
-type result = {
-  request_id : request_id;
-  meth : Http.meth;
-  url : url;
-  response : response;
-}
+module type C = sig
+  type request_id
 
-val request : (?retry_rounds:int -> ?timeout:float
-               -> (meth * request * request_id) list -> result list)
+  type result = {
+    request_id : request_id;
+    meth : Http.meth;
+    url : url;
+    response : response;
+  }
+
+  val request : (?retry_rounds:int -> ?timeout:float
+    -> (Http.meth * request * request_id) list -> result list)
+end
+
+module type RequestId = sig type t end
+
+module Make (Id : RequestId) : C with type request_id = Id.t

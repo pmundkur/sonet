@@ -1,6 +1,6 @@
 (**************************************************************************)
 (*                                                                        *)
-(*  Copyright (C) 2010      Prashanth Mundkur.                            *)
+(*  Copyright (C) 2010-2012  Prashanth Mundkur.                           *)
 (*  Author  Prashanth Mundkur <prashanth.mundkur _at_ gmail.com>          *)
 (*                                                                        *)
 (*  This program is free software; you can redistribute it and/or         *)
@@ -16,8 +16,9 @@
 (**************************************************************************)
 
 module H = Http
-module Client = Http_client
 module U = Unix
+module C = Http_client
+module HC = Http_client.Make(struct type t = unit end)
 
 let string_of_resp resp =
   let buf = Buffer.create 1024 in
@@ -25,26 +26,26 @@ let string_of_resp resp =
   Buffer.contents buf
 
 let string_of_req = function
-  | Client.Payload (_, _) -> "payload"
-  | Client.FileRecv (_, _) -> "download"
-  | Client.FileSend (_, _) -> "upload"
+  | C.Payload (_, _)  -> "payload"
+  | C.FileRecv (_, _) -> "download"
+  | C.FileSend (_, _) -> "upload"
 
 let funopt f = function
-  | None -> ()
+  | None   -> ()
   | Some e -> f e
 
 let errmsg (u, e) =
-  Printf.printf "\t%s: %s\n" u (Client.string_of_error e)
+  Printf.printf "\t%s: %s\n" u (C.string_of_error e)
 
 let show_result verbose r =
-  Printf.printf "\n%s %s: " (H.string_of_meth r.Client.meth) r.Client.url;
-  (match r.Client.response with
-    | Client.Failure (one, rest) ->
+  Printf.printf "\n%s %s: " (H.string_of_meth r.HC.meth) r.HC.url;
+  (match r.HC.response with
+    | C.Failure (one, rest) ->
       Printf.printf "No response\n";
       errmsg one; List.iter errmsg rest
-    | Client.Success (resp, errs) ->
+    | C.Success (resp, errs) ->
       Printf.printf "Response received\n";
-      if verbose || r.Client.meth = H.Head then Printf.printf "%s\n" (string_of_resp resp);
+      if verbose || r.HC.meth = H.Head then Printf.printf "%s\n" (string_of_resp resp);
       List.iter errmsg errs
   )
 
@@ -64,7 +65,7 @@ let print_usage () =
   exit 1
 
 let check_supported_url url =
-  if not (Client.is_supported_url url)
+  if not (C.is_supported_url url)
   then (Printf.eprintf "Unsupported url: %s\n" url; exit 1)
 
 let run () =
@@ -72,18 +73,18 @@ let run () =
   let verbose = ref false in
   let get_url urls =
     List.iter check_supported_url urls;
-    reqs := (H.Get, Client.Payload (urls, None), 0) :: !reqs in
+    reqs := (H.Get, C.Payload (urls, None), ()) :: !reqs in
   let head_url urls =
     List.iter check_supported_url urls;
-    reqs := (H.Head, Client.Payload (urls, None), 0) :: !reqs in
+    reqs := (H.Head, C.Payload (urls, None), ()) :: !reqs in
   let send_url meth urls filename =
     List.iter check_supported_url urls;
     let fd = U.openfile filename [U.O_RDONLY] 0 in
-      reqs := (meth, Client.FileSend (urls, fd), 0) :: !reqs in
+      reqs := (meth, C.FileSend (urls, fd), ()) :: !reqs in
   let save_url urls filename =
     List.iter check_supported_url urls;
     let fd = U.openfile filename [U.O_WRONLY; U.O_CREAT; U.O_TRUNC] 0o640 in
-      reqs := (H.Get, Client.FileRecv (urls, fd), 0) :: !reqs in
+      reqs := (H.Get, C.FileRecv (urls, fd), ()) :: !reqs in
   let num_args = Array.length Sys.argv in
   let get_arg opt indx =
     if indx >= num_args
@@ -132,7 +133,7 @@ let run () =
          )
   in
   process_args 1;
-  let results = Client.request !reqs
+  let results = HC.request !reqs
   in show_results !verbose results
 
 let _ =
@@ -141,10 +142,10 @@ let _ =
   Printexc.record_backtrace true;
   try run ()
   with
-    | Client.Invalid_url (url, e) ->
+    | C.Invalid_url (url, e) ->
       Printf.eprintf "Invalid url %s: %s\n%!" url e
-    | Client.Invalid_request r ->
-      Printf.eprintf "Invalid %s request: no urls!\n%!" (string_of_req r)
+    | C.Invalid_request e ->
+      Printf.eprintf "Invalid request: %s!\n%!" e
     | e ->
       Printf.eprintf "%s\n%s\n%!"
         (Printexc.to_string e)
