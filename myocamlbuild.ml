@@ -17,7 +17,7 @@
 
 open Ocamlbuild_plugin
 
-let headers = ["eventloop/eventloop.h"];;
+let headers = ["eventloop/eventloop.h"; "eventloop/posix_stubs.h"];;
 let libeventloop = "eventloop/libeventloop." ^ !Options.ext_lib;;
 let libodbus = "protocols/dbus/libodbus." ^ !Options.ext_lib;;
 
