@@ -1,2 +1,3 @@
 <**/*.ml{i,}>: annot
+<eventloop>: include
 "benchmarks": not_hygienic
