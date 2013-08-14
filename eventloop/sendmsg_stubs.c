@@ -55,7 +55,8 @@ CAMLprim value stub_sendmsg(value fd, value iovec_strings, value cmsgs, value se
         list = Field(list, 1);
     }
     if (msg.msg_iovlen > 0) {
-        msg.msg_iov = (struct iovec *) malloc(msg.msg_iovlen * sizeof(struct iovec));
+        if ((msg.msg_iov = (struct iovec *) malloc(msg.msg_iovlen * sizeof(struct iovec))) == NULL)
+            goto on_error;
 
         msg.msg_iovlen = 0;
         list = iovec_strings;
@@ -74,7 +75,8 @@ CAMLprim value stub_sendmsg(value fd, value iovec_strings, value cmsgs, value se
         list = Field(list, 1);
     }
     if (msg.msg_controllen > 0) {
-        msg.msg_control = (struct cmsghdr *) malloc(msg.msg_controllen);
+        if ((msg.msg_control = (struct cmsghdr *) malloc(msg.msg_controllen)) == NULL)
+            goto on_error;
 
         list = cmsgs;
         struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
@@ -96,6 +98,7 @@ CAMLprim value stub_sendmsg(value fd, value iovec_strings, value cmsgs, value se
     ret = sendmsg(Int_val(fd), &msg, flags);
     leave_blocking_section();
 
+ on_error:
     if (msg.msg_iov)     free(msg.msg_iov);
     if (msg.msg_control) free(msg.msg_control);
 
