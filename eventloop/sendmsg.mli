@@ -32,27 +32,36 @@ type cmsg =
 
 (* TODO: check *BSD for flag support. *)
 type send_flag =
-| SEND_CMSG_CLOEXEC
+| SEND_CONFIRM
+| SEND_DONTROUTE
 | SEND_DONTWAIT
-| SEND_ERRQUEUE
+| SEND_EOR
+| SEND_MORE
+| SEND_NOSIGNAL
 | SEND_OOB
-| SEND_PEEK
-| SEND_TRUNC
-| SEND_WAITALL
 
 type recv_flag =
-| RECV_EOR
-| RECV_TRUNC
-| RECV_CTRUNC
-| RECV_OOB
+| RECV_CMSG_CLOEXEC
+| RECV_DONTWAIT
 | RECV_ERRQUEUE
+| RECV_OOB
+| RECV_PEEK
+| RECV_TRUNC
+| RECV_WAITALL
+
+type msg_flag =
+| MSG_EOR
+| MSG_TRUNC
+| MSG_CTRUNC
+| MSG_OOB
+| MSG_ERRQUEUE
 
 (* TODO: add the sock address in msg_name. *)
 type msg = {
   msg_iovec : string list;
   msg_cmsgs : cmsg list;
-  msg_flags : recv_flag list;
+  msg_flags : msg_flag list;    (* ignored on sendmsg *)
 }
 
 val sendmsg : Unix.file_descr -> msg -> send_flag list -> int
-val recvmsg : Unix.file_descr -> msg
+val recvmsg : Unix.file_descr -> recv_flag list -> msg

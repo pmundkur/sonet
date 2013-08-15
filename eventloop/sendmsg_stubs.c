@@ -30,14 +30,16 @@
 #include "posix_stubs.h"
 
 static int send_flag_table[] = {
+    MSG_CONFIRM, MSG_DONTROUTE, MSG_DONTWAIT, MSG_EOR, MSG_MORE, MSG_NOSIGNAL, MSG_OOB
+};
+
+static int recv_flag_table[] = {
     MSG_CMSG_CLOEXEC, MSG_DONTWAIT, MSG_ERRQUEUE, MSG_OOB, MSG_PEEK, MSG_TRUNC, MSG_WAITALL
 };
 
-/*
-static int recv_flag_table[] = {
+static int msg_flag_table[] = {
     MSG_EOR, MSG_TRUNC, MSG_CTRUNC, MSG_OOB, MSG_ERRQUEUE
 };
-*/
 
 #include <string.h>
 #include <stdio.h>
@@ -107,7 +109,20 @@ CAMLprim value stub_sendmsg(value fd, value iovec_strings, value cmsgs, value se
     CAMLreturn(Val_int(ret));
 }
 
-CAMLprim value stub_recvmsg(value fd) {
+CAMLprim value stub_recvmsg(value fd, value recv_flags) {
     CAMLparam1(fd);
-    CAMLreturn(Val_unit);
+    CAMLlocal1(vret);
+    int ret, flags;
+    struct msghdr msg = {0};
+
+    flags = caml_convert_flag_list(recv_flags, recv_flag_table);
+
+    enter_blocking_section();
+    ret = recvmsg(Int_val(fd), &msg, flags);
+    leave_blocking_section();
+
+    if (ret == -1)
+        raise_unix_error(errno, "recvmsg", "");
+
+    CAMLreturn(vret);
 }

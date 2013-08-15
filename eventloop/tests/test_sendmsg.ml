@@ -6,7 +6,7 @@ let make_msg () =
   let iov = ["a"; "b"; "c"] in
   let cmsgs = [Cmsg_generic (0,0,"cmsg0\000");
                Cmsg_generic (1,1,"cmsg1\000");] in
-  let rflags = [RECV_ERRQUEUE] in
+  let rflags = [MSG_ERRQUEUE] in
   {msg_iovec = iov; msg_cmsgs = cmsgs; msg_flags = rflags}
 
 let make_socks () =

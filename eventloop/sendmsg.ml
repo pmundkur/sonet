@@ -25,36 +25,45 @@ type cmsg =
 | Cmsg_generic of proto_level * proto_type * string
 
 type send_flag =
-| SEND_CMSG_CLOEXEC
+| SEND_CONFIRM
+| SEND_DONTROUTE
 | SEND_DONTWAIT
-| SEND_ERRQUEUE
+| SEND_EOR
+| SEND_MORE
+| SEND_NOSIGNAL
 | SEND_OOB
-| SEND_PEEK
-| SEND_TRUNC
-| SEND_WAITALL
 
 type recv_flag =
-| RECV_EOR
-| RECV_TRUNC
-| RECV_CTRUNC
-| RECV_OOB
+| RECV_CMSG_CLOEXEC
+| RECV_DONTWAIT
 | RECV_ERRQUEUE
+| RECV_OOB
+| RECV_PEEK
+| RECV_TRUNC
+| RECV_WAITALL
+
+type msg_flag =
+| MSG_EOR
+| MSG_TRUNC
+| MSG_CTRUNC
+| MSG_OOB
+| MSG_ERRQUEUE
 
 type msg = {
   msg_iovec : string list;
   msg_cmsgs : cmsg list;
-  msg_flags : recv_flag list;
+  msg_flags : msg_flag list;    (* ignored on sendmsg *)
 }
 
 external sendmsg_impl : Unix.file_descr -> string list -> cmsg list -> send_flag list -> int
   = "stub_sendmsg"
 
-external recvmsg_impl : Unix.file_descr -> string list * cmsg list * recv_flag list
+external recvmsg_impl : Unix.file_descr -> recv_flag list -> string list * cmsg list * msg_flag list
   = "stub_recvmsg"
 
 let sendmsg fd msg flags =
   sendmsg_impl fd msg.msg_iovec msg.msg_cmsgs flags
 
-let recvmsg fd =
-  let iovec, cmsgs, flags = recvmsg_impl fd in
+let recvmsg fd recv_flags =
+  let iovec, cmsgs, flags = recvmsg_impl fd recv_flags in
   {msg_iovec = iovec; msg_cmsgs = cmsgs; msg_flags = flags}
