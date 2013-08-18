@@ -18,9 +18,6 @@
  * GNU Lesser General Public License for more details.
  */
 
-/* Reference:
-http://mail.python.org/pipermail//python-bugs-list/2011-June/140154.html
-*/
 #define _GNU_SOURCE
 #include <errno.h>
 #include <sys/types.h>
