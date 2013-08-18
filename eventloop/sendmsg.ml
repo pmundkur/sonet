@@ -24,6 +24,16 @@ type cred = {
   gid : int;    (* GID of sending process. *)
 }
 
+let getcred () =
+  {pid = Unix.getpid ();
+   uid = Unix.getuid ();
+   gid = Unix.getgid ()}
+
+external set_passcred_impl : Unix.file_descr -> bool -> unit = "stub_set_passcred"
+
+let set_passcred fd bool =
+  set_passcred_impl fd bool
+
 type proto_level = int
 type proto_type  = int
 type cmsg =

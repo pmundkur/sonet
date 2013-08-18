@@ -18,14 +18,18 @@
  * GNU Lesser General Public License for more details.
  *)
 
-
-(* Control messages that can be sent and received via sendmsg(). *)
+(* credentials *)
 
 type cred = {
   pid : int;    (* PID of sending process. *)
   uid : int;    (* UID of sending process. *)
   gid : int;    (* GID of sending process. *)
 }
+
+val getcred : unit -> cred      (* credentials of caller *)
+val set_passcred : Unix.file_descr -> bool -> unit
+
+(* Control messages that can be sent and received via sendmsg(). *)
 
 type proto_level = int
 type proto_type  = int

@@ -2,18 +2,22 @@ open Sendmsg
 
 let sflags = []
 
+let show_cred c =
+  Printf.sprintf "pid:%d uid:%d gid:%d" c.pid c.uid c.gid
+
 let show_cmsg = function
   | Cmsg_generic (l, t, s) ->
     Printf.printf "generic (%d, %d): %s\n" l t s
   | Cmsg_scm_rights l ->
     Printf.printf "rights: %d fds\n" (List.length l)
   | Cmsg_scm_credentials c ->
-    Printf.printf "creds: \n"
+    Printf.printf "creds: %s\n" (show_cred c)
 
 let make_msg () =
   let iov = ["a"; "b"; "c"] in
   let cmsgs = [(Cmsg_scm_rights [Unix.stdin; Unix.stdout; Unix.stderr]);
-               (Cmsg_scm_rights [Unix.stdin; Unix.stdout])
+               (Cmsg_scm_rights [Unix.stdin; Unix.stdout]);
+               (Cmsg_scm_credentials (getcred ()))
               ] in
   let rflags = [MSG_ERRQUEUE] in
   {msg_iovec = iov; msg_cmsgs = cmsgs; msg_flags = rflags}
@@ -31,10 +35,10 @@ let make_socks () =
 let test_sendrecv () =
   let sndr, rcvr = make_socks () in
   let smsg = make_msg () in
+  set_passcred sndr true;
+  set_passcred rcvr true;
   Printf.printf "test_send: %d\n%!" (Sendmsg.sendmsg sndr smsg sflags);
-  let rmsg = Sendmsg.recvmsg rcvr [] in
-  show_msg rmsg
-
+  show_msg (Sendmsg.recvmsg rcvr [])
 
 let run_tests () =
   Eventloop.init ();

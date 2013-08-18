@@ -71,6 +71,16 @@ static value make_flag_list(int f, int *flags, int n) {
     CAMLreturn(vlist);
 }
 
+/* socket option for credentials */
+CAMLprim value stub_set_passcred(value fd, value flag) {
+    CAMLparam2(fd, flag);
+    int setting = Bool_val(flag);
+    int ret = setsockopt(Int_val(fd), SOL_SOCKET, SO_PASSCRED, &setting, sizeof(setting));
+    if (ret < 0)
+        raise_unix_error(errno, "set_passcred", "");
+    CAMLreturn(Val_unit);
+}
+
 /* utility to compute amount of actual data in a cmsg. */
 static int cmsg_data_len(const struct msghdr *msg, const struct cmsghdr *cmsg) {
     size_t data_len;
@@ -85,6 +95,8 @@ static int cmsg_data_len(const struct msghdr *msg, const struct cmsghdr *cmsg) {
     /* if truncated, return only amount present */
     return (msg_data_end - ((char *)cmsg + CMSG_LEN(0)));
 }
+
+/* Main {send,recv}msg stubs and helpers. */
 
 enum cmsg_tag {
     Cmsg_generic,
@@ -132,6 +144,7 @@ static void to_cmsg(value v, struct cmsghdr *cmsg) {
         cmsg->cmsg_len   = CMSG_LEN(sizeof(cred));
         cmsg->cmsg_level = SOL_SOCKET;
         cmsg->cmsg_type  = SCM_CREDENTIALS;
+        v = Field(v, 0);
         cred.pid = Int_val(Field(v, 0));
         cred.uid = Int_val(Field(v, 1));
         cred.gid = Int_val(Field(v, 2));
@@ -196,7 +209,7 @@ CAMLprim value stub_sendmsg(value fd, value iovec_strings, value cmsgs, value se
     if (msg.msg_iov)     free(msg.msg_iov);
     if (msg.msg_control) free(msg.msg_control);
 
-    if (ret == -1)
+    if (ret < 0)
         raise_unix_error(errno, "sendmsg", "");
     CAMLreturn(Val_int(ret));
 }
@@ -210,8 +223,8 @@ static value of_cmsg(const struct msghdr *msg, const struct cmsghdr *cmsg) {
         switch (cmsg->cmsg_type) {
         case SCM_RIGHTS:
             fd_end = (int *)(CMSG_DATA(cmsg) + cmsg_data_len(msg, cmsg));
-            fdp = (int *)CMSG_DATA(cmsg);
-            vret = Val_int(0);
+            fdp   = (int *)CMSG_DATA(cmsg);
+            vret  = Val_int(0);
             while (fdp < fd_end) {
                 v = caml_alloc(2, 0);
                 Field(v, 0) = Val_int(*fdp);
@@ -234,7 +247,7 @@ static value of_cmsg(const struct msghdr *msg, const struct cmsghdr *cmsg) {
             CAMLreturn(vret);
         }
     }
-    vret = caml_alloc(3, 0);
+    vret = caml_alloc(3, Cmsg_generic);
     Field(vret, 0) = Val_int(cmsg->cmsg_level);
     Field(vret, 1) = Val_int(cmsg->cmsg_type);
     Field(vret, 2) = caml_alloc_string(0); // avoid returning unknown data; FIXME
@@ -252,7 +265,7 @@ CAMLprim value stub_recvmsg(value fd, value recv_flags) {
     if (cbufsize == 0)
         cbufsize = sysconf(_SC_PAGESIZE);
 
-    io.iov_len = cbufsize;
+    io.iov_len  = cbufsize;
     io.iov_base = malloc(io.iov_len);
     msg.msg_iov = &io;
     msg.msg_iovlen = 1;
@@ -270,7 +283,7 @@ CAMLprim value stub_recvmsg(value fd, value recv_flags) {
     ret = recvmsg(Int_val(fd), &msg, flags);
     leave_blocking_section();
 
-    if (ret == -1) {
+    if (ret < 0) {
         if (io.iov_base)     free(io.iov_base);
         if (msg.msg_control) free(msg.msg_control);
         raise_unix_error(errno, "recvmsg", "");
