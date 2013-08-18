@@ -42,18 +42,15 @@ type cmsg =
 | Cmsg_scm_credentials of cred
 
 type send_flag =
-| SEND_CONFIRM
 | SEND_DONTROUTE
 | SEND_DONTWAIT
 | SEND_EOR
-| SEND_MORE
 | SEND_NOSIGNAL
 | SEND_OOB
 
 type recv_flag =
 | RECV_CMSG_CLOEXEC
 | RECV_DONTWAIT
-| RECV_ERRQUEUE
 | RECV_OOB
 | RECV_PEEK
 | RECV_TRUNC
@@ -64,21 +61,17 @@ type msg_flag =
 | MSG_TRUNC
 | MSG_CTRUNC
 | MSG_OOB
-| MSG_ERRQUEUE
 
 let send_flag_name = function
-  | SEND_CONFIRM    -> "SEND_CONFIRM"
   | SEND_DONTROUTE  -> "SEND_DONTROUTE"
   | SEND_DONTWAIT   -> "SEND_DONTWAIT"
   | SEND_EOR        -> "SEND_EOR"
-  | SEND_MORE       -> "SEND_MORE"
   | SEND_NOSIGNAL   -> "SEND_NOSIGNAL"
   | SEND_OOB        -> "SEND_OOB"
 
 let recv_flag_name = function
   | RECV_CMSG_CLOEXEC -> "RECV_CMSG_CLOEXEC"
   | RECV_DONTWAIT     -> "RECV_DONTWAIT"
-  | RECV_ERRQUEUE     -> "RECV_ERRQUEUE"
   | RECV_OOB          -> "RECV_OOB"
   | RECV_PEEK         -> "RECV_PEEK"
   | RECV_TRUNC        -> "RECV_TRUNC"
@@ -89,7 +82,6 @@ let msg_flag_name = function
   | MSG_TRUNC      -> "MSG_TRUNC"
   | MSG_CTRUNC     -> "MSG_CTRUNC"
   | MSG_OOB        -> "MSG_OOB"
-  | MSG_ERRQUEUE   -> "MSG_ERRQUEUE"
 
 type msg = {
   msg_iovec : string list;

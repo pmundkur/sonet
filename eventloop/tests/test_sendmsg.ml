@@ -19,7 +19,7 @@ let make_msg () =
                (Cmsg_scm_rights [Unix.stdin; Unix.stdout]);
                (Cmsg_scm_credentials (getcred ()))
               ] in
-  let rflags = [MSG_ERRQUEUE] in
+  let rflags = [] in
   {msg_iovec = iov; msg_cmsgs = cmsgs; msg_flags = rflags}
 
 let show_msg m =

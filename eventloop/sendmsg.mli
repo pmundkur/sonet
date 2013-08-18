@@ -38,20 +38,16 @@ type cmsg =
 | Cmsg_scm_rights of Unix.file_descr list
 | Cmsg_scm_credentials of cred
 
-(* TODO: check *BSD for flag support. *)
 type send_flag =
-| SEND_CONFIRM
 | SEND_DONTROUTE
 | SEND_DONTWAIT
 | SEND_EOR
-| SEND_MORE
 | SEND_NOSIGNAL
 | SEND_OOB
 
 type recv_flag =
 | RECV_CMSG_CLOEXEC
 | RECV_DONTWAIT
-| RECV_ERRQUEUE
 | RECV_OOB
 | RECV_PEEK
 | RECV_TRUNC
@@ -62,7 +58,6 @@ type msg_flag =
 | MSG_TRUNC
 | MSG_CTRUNC
 | MSG_OOB
-| MSG_ERRQUEUE
 
 val send_flag_name : send_flag -> string
 val recv_flag_name : recv_flag -> string

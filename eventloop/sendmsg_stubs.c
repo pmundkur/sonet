@@ -33,15 +33,15 @@
 #include "posix_stubs.h"
 
 static int send_flag_table[] = {
-    MSG_CONFIRM, MSG_DONTROUTE, MSG_DONTWAIT, MSG_EOR, MSG_MORE, MSG_NOSIGNAL, MSG_OOB
+    MSG_DONTROUTE, MSG_DONTWAIT, MSG_EOR, MSG_NOSIGNAL, MSG_OOB
 };
 
 static int recv_flag_table[] = {
-    MSG_CMSG_CLOEXEC, MSG_DONTWAIT, MSG_ERRQUEUE, MSG_OOB, MSG_PEEK, MSG_TRUNC, MSG_WAITALL
+    MSG_CMSG_CLOEXEC, MSG_DONTWAIT, MSG_OOB, MSG_PEEK, MSG_TRUNC, MSG_WAITALL
 };
 
 static int msg_flag_table[] = {
-    MSG_EOR, MSG_TRUNC, MSG_CTRUNC, MSG_OOB, MSG_ERRQUEUE
+    MSG_EOR, MSG_TRUNC, MSG_CTRUNC, MSG_OOB
 };
 
 /* Two candidates for the OCaml C library. */
