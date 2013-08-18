@@ -18,11 +18,18 @@
  * GNU Lesser General Public License for more details.
  *)
 
+type cred = {
+  pid : int;    (* PID of sending process. *)
+  uid : int;    (* UID of sending process. *)
+  gid : int;    (* GID of sending process. *)
+}
+
 type proto_level = int
 type proto_type  = int
 type cmsg =
-(* Always keep Cmsg_generic as the first variant. *)
 | Cmsg_generic of proto_level * proto_type * string
+| Cmsg_scm_rights of Unix.file_descr list
+| Cmsg_scm_credentials of cred
 
 type send_flag =
 | SEND_CONFIRM
@@ -49,10 +56,35 @@ type msg_flag =
 | MSG_OOB
 | MSG_ERRQUEUE
 
+let send_flag_name = function
+  | SEND_CONFIRM    -> "SEND_CONFIRM"
+  | SEND_DONTROUTE  -> "SEND_DONTROUTE"
+  | SEND_DONTWAIT   -> "SEND_DONTWAIT"
+  | SEND_EOR        -> "SEND_EOR"
+  | SEND_MORE       -> "SEND_MORE"
+  | SEND_NOSIGNAL   -> "SEND_NOSIGNAL"
+  | SEND_OOB        -> "SEND_OOB"
+
+let recv_flag_name = function
+  | RECV_CMSG_CLOEXEC -> "RECV_CMSG_CLOEXEC"
+  | RECV_DONTWAIT     -> "RECV_DONTWAIT"
+  | RECV_ERRQUEUE     -> "RECV_ERRQUEUE"
+  | RECV_OOB          -> "RECV_OOB"
+  | RECV_PEEK         -> "RECV_PEEK"
+  | RECV_TRUNC        -> "RECV_TRUNC"
+  | RECV_WAITALL      -> "RECV_WAITALL"
+
+let msg_flag_name = function
+  | MSG_EOR        -> "MSG_EOR"
+  | MSG_TRUNC      -> "MSG_TRUNC"
+  | MSG_CTRUNC     -> "MSG_CTRUNC"
+  | MSG_OOB        -> "MSG_OOB"
+  | MSG_ERRQUEUE   -> "MSG_ERRQUEUE"
+
 type msg = {
   msg_iovec : string list;
   msg_cmsgs : cmsg list;
-  msg_flags : msg_flag list;    (* ignored on sendmsg *)
+  msg_flags : msg_flag list;
 }
 
 external sendmsg_impl : Unix.file_descr -> string list -> cmsg list -> send_flag list -> int

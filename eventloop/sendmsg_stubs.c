@@ -18,9 +18,15 @@
  * GNU Lesser General Public License for more details.
  */
 
+/* Reference:
+http://mail.python.org/pipermail//python-bugs-list/2011-June/140154.html
+*/
+#define _GNU_SOURCE
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <unistd.h>
+#include <string.h>
 
 #include <caml/memory.h>
 #include <caml/alloc.h>
@@ -41,8 +47,105 @@ static int msg_flag_table[] = {
     MSG_EOR, MSG_TRUNC, MSG_CTRUNC, MSG_OOB, MSG_ERRQUEUE
 };
 
-#include <string.h>
-#include <stdio.h>
+/* Two candidates for the OCaml C library. */
+static int list_length (value list) {
+    int len = 0;
+    while (list != Val_int(0)) {
+        len++;
+        list = Field(list, 1);
+    }
+    return len;
+}
+static value make_flag_list(int f, int *flags, int n) {
+    CAMLparam0();
+    CAMLlocal2(vlist, v);
+    int i;
+
+    vlist = Val_int(0);
+    for (i = 0; f && i < n; i++) {
+        if (f & flags[i]) {
+            v = caml_alloc(2, 0);
+            Field(v, 0) = Val_int(i);
+            Field(v, 1) = vlist;
+            vlist = v;
+            f &= ~flags[i];
+        }
+    }
+    CAMLreturn(vlist);
+}
+
+/* utility to compute amount of actual data in a cmsg. */
+static int cmsg_data_len(const struct msghdr *msg, const struct cmsghdr *cmsg) {
+    size_t data_len;
+    char *msg_data_end = (char *)msg->msg_control + msg->msg_controllen;
+    char *cmsg_data_end = (char *)cmsg + cmsg->cmsg_len;
+    if (cmsg->cmsg_len <= CMSG_LEN(0))
+        return 0;
+    data_len = cmsg->cmsg_len - CMSG_LEN(0);
+    /* common case */
+    if (cmsg_data_end <= msg_data_end)
+        return data_len;
+    /* if truncated, return only amount present */
+    return (msg_data_end - ((char *)cmsg + CMSG_LEN(0)));
+}
+
+enum cmsg_tag {
+    Cmsg_generic,
+    Cmsg_scm_rights,
+    Cmsg_scm_credentials,
+};
+
+static size_t vcmsg_data_len(value v) {
+    switch (Tag_val(v)) {
+    case Cmsg_generic:
+        return caml_string_length(Field(v, 2));
+    case Cmsg_scm_rights:
+        return sizeof(int) * list_length(Field(v, 0));
+    case Cmsg_scm_credentials:
+        return sizeof(struct ucred);
+    }
+    return 0;
+}
+
+/* NOTE: This assumes the containing control buffer has enough space
+   allocated for the cmsg, e.g. using vcsmg_space(). */
+static void to_cmsg(value v, struct cmsghdr *cmsg) {
+    struct ucred cred;
+    int *fdp;
+    switch (Tag_val(v)) {
+    case Cmsg_generic:
+        cmsg->cmsg_len   = CMSG_LEN(caml_string_length(Field(v, 2)));
+        cmsg->cmsg_level = Int_val(Field(v, 0));
+        cmsg->cmsg_type  = Int_val(Field(v, 1));
+        memcpy(CMSG_DATA(cmsg), String_val(Field(v, 2)), caml_string_length(Field(v, 2)));
+        break;
+    case Cmsg_scm_rights:
+        cmsg->cmsg_level = SOL_SOCKET;
+        cmsg->cmsg_type  = SCM_RIGHTS;
+        /* copy from fd list */
+        fdp = (int *)CMSG_DATA(cmsg);
+        v = Field(v, 0);
+        cmsg->cmsg_len = CMSG_LEN(sizeof(int) * list_length(v));
+        while (v != Val_int(0)) {
+            *fdp++ = Int_val(Field(v, 0));
+            v = Field(v, 1);
+        }
+        break;
+    case Cmsg_scm_credentials:
+        cmsg->cmsg_len   = CMSG_LEN(sizeof(cred));
+        cmsg->cmsg_level = SOL_SOCKET;
+        cmsg->cmsg_type  = SCM_CREDENTIALS;
+        cred.pid = Int_val(Field(v, 0));
+        cred.uid = Int_val(Field(v, 1));
+        cred.gid = Int_val(Field(v, 2));
+        memcpy(CMSG_DATA(cmsg), &cred, sizeof(cred));
+        break;
+    default:
+        cmsg->cmsg_len   = CMSG_LEN(0);
+        cmsg->cmsg_level = 0;
+        cmsg->cmsg_type  = 0;
+    }
+}
 
 CAMLprim value stub_sendmsg(value fd, value iovec_strings, value cmsgs, value send_flags) {
     CAMLparam4(fd, iovec_strings, cmsgs, send_flags);
@@ -50,7 +153,7 @@ CAMLprim value stub_sendmsg(value fd, value iovec_strings, value cmsgs, value se
     int ret, flags;
     struct msghdr msg = {0};
 
-    /* deal with iovecs */
+    /* iovecs */
     list = iovec_strings;
     while (list != Val_int(0)) {
         msg.msg_iovlen++;
@@ -59,7 +162,6 @@ CAMLprim value stub_sendmsg(value fd, value iovec_strings, value cmsgs, value se
     if (msg.msg_iovlen > 0) {
         if ((msg.msg_iov = (struct iovec *) malloc(msg.msg_iovlen * sizeof(struct iovec))) == NULL)
             goto on_error;
-
         msg.msg_iovlen = 0;
         list = iovec_strings;
         while (list != Val_int(0)) {
@@ -69,31 +171,24 @@ CAMLprim value stub_sendmsg(value fd, value iovec_strings, value cmsgs, value se
             list = Field(list, 1);
         }
     }
-    /* deal with cmsgs */
+    /* cmsgs */
     list = cmsgs;
     while (list != Val_int(0)) {
-        value v = Field(list, 0);
-        msg.msg_controllen += CMSG_SPACE(caml_string_length(Field(v, 2)));
+        msg.msg_controllen += CMSG_SPACE(vcmsg_data_len(Field(list, 0)));
         list = Field(list, 1);
     }
     if (msg.msg_controllen > 0) {
         if ((msg.msg_control = (struct cmsghdr *) malloc(msg.msg_controllen)) == NULL)
             goto on_error;
-
         list = cmsgs;
         struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
         while (list != Val_int(0)) {
-            value v = Field(list, 0);
-            /* cmsg_len includes size of cmsghdr */
-            cmsg->cmsg_len   = CMSG_LEN(Wosize_val(Field(v, 2)));
-            cmsg->cmsg_level = Int_val(Field(v, 0));
-            cmsg->cmsg_type  = Int_val(Field(v, 1));
-            memcpy(CMSG_DATA(cmsg), String_val(Field(v, 2)), caml_string_length(Field(v, 2)));
+            to_cmsg(Field(list, 0), cmsg);
             cmsg = CMSG_NXTHDR(&msg, cmsg);
             list = Field(list, 1);
         }
     }
-    /* deal with send flags */
+    /* send flags */
     flags = caml_convert_flag_list(send_flags, send_flag_table);
 
     enter_blocking_section();
@@ -109,20 +204,124 @@ CAMLprim value stub_sendmsg(value fd, value iovec_strings, value cmsgs, value se
     CAMLreturn(Val_int(ret));
 }
 
+static value of_cmsg(const struct msghdr *msg, const struct cmsghdr *cmsg) {
+    CAMLparam0();
+    CAMLlocal2(vret, v);
+    if (cmsg->cmsg_level == SOL_SOCKET) {
+        struct ucred cred;
+        int *fdp, *fd_end;
+        switch (cmsg->cmsg_type) {
+        case SCM_RIGHTS:
+            fd_end = (int *)(CMSG_DATA(cmsg) + cmsg_data_len(msg, cmsg));
+            fdp = (int *)CMSG_DATA(cmsg);
+            vret = Val_int(0);
+            while (fdp < fd_end) {
+                v = caml_alloc(2, 0);
+                Field(v, 0) = Val_int(*fdp);
+                Field(v, 1) = vret;
+                vret = v;
+                fdp++;
+            }
+            v = vret;
+            vret = caml_alloc(1, Cmsg_scm_rights);
+            Field(vret, 0) = v;
+            CAMLreturn(vret);
+        case SCM_CREDENTIALS:
+            memcpy(&cred, CMSG_DATA(cmsg), sizeof(cred));
+            v = caml_alloc(3, 0);
+            Field(v, 0) = Val_int(cred.pid);
+            Field(v, 1) = Val_int(cred.uid);
+            Field(v, 2) = Val_int(cred.gid);
+            vret = caml_alloc(1, Cmsg_scm_credentials);
+            Field(vret, 0) = v;
+            CAMLreturn(vret);
+        }
+    }
+    vret = caml_alloc(3, 0);
+    Field(vret, 0) = Val_int(cmsg->cmsg_level);
+    Field(vret, 1) = Val_int(cmsg->cmsg_type);
+    Field(vret, 2) = caml_alloc_string(0); // avoid returning unknown data; FIXME
+    CAMLreturn(vret);
+}
+
 CAMLprim value stub_recvmsg(value fd, value recv_flags) {
     CAMLparam1(fd);
-    CAMLlocal1(vret);
-    int ret, flags;
+    CAMLlocal3(vret, vlist, v);
+
+    int ret, orig_flags, flags, sized;
+    struct iovec io;
     struct msghdr msg = {0};
+    static int cbufsize = 0;
+    if (cbufsize == 0)
+        cbufsize = sysconf(_SC_PAGESIZE);
 
-    flags = caml_convert_flag_list(recv_flags, recv_flag_table);
+    io.iov_len = cbufsize;
+    io.iov_base = malloc(io.iov_len);
+    msg.msg_iov = &io;
+    msg.msg_iovlen = 1;
+    msg.msg_controllen = cbufsize;
+    msg.msg_control = malloc(msg.msg_controllen);
 
+    orig_flags = caml_convert_flag_list(recv_flags, recv_flag_table);
+
+    /* Loop, peeking at the receive queue, until our recv buffers are
+       correctly sized. */
+    flags = orig_flags | MSG_PEEK;
+    sized = 0;
+ retry:
     enter_blocking_section();
     ret = recvmsg(Int_val(fd), &msg, flags);
     leave_blocking_section();
 
-    if (ret == -1)
+    if (ret == -1) {
+        if (io.iov_base)     free(io.iov_base);
+        if (msg.msg_control) free(msg.msg_control);
         raise_unix_error(errno, "recvmsg", "");
+    } else if (io.iov_len < ret || msg.msg_flags & MSG_TRUNC) {
+        io.iov_len *= 2;
+        io.iov_base = realloc(io.iov_base, io.iov_len);
+        goto retry;
+    } else if (msg.msg_flags & MSG_CTRUNC) {
+        msg.msg_controllen *= 2;
+        msg.msg_control = realloc(msg.msg_control, msg.msg_controllen);
+        goto retry;
+    } else if (sized == 0) {
+        /* Buffers are now correctly sized, no need to do internal
+           peek anymore. */
+        flags = orig_flags;
+        sized = 1;
+        goto retry;
+    }
+
+    vret = caml_alloc_tuple(3);
+    Field(vret, 0) = Field(vret, 1) = Field(vret, 2) = Val_int(0);
+
+    /* iovec */
+    vlist = Val_int(0);
+    if (ret > 0) {
+        v = caml_alloc(2, 0);
+        Field(v, 1) = vlist;
+        Field(v, 0) = caml_alloc_string(ret);
+        memmove(String_val(Field(v, 0)), io.iov_base, ret);
+        vlist = v;
+    }
+    Field(vret, 0) = vlist;
+    /* cmsgs */
+    vlist = Val_int(0);
+    if (msg.msg_controllen > 0) {
+        struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
+        while (cmsg) {
+            v = caml_alloc(2, 0);
+            Field(v, 0) = of_cmsg(&msg, cmsg);
+            Field(v, 1) = vlist;
+            cmsg = CMSG_NXTHDR(&msg, cmsg);
+            vlist = v;
+        }
+    }
+    Field(vret, 1) = vlist;
+    /* msg_flags */
+    Field(vret, 2) = make_flag_list(msg.msg_flags, msg_flag_table,
+                                    sizeof(msg_flag_table)/sizeof(int));
 
     CAMLreturn(vret);
 }
