@@ -174,7 +174,6 @@ static void to_cmsg(value v, struct cmsghdr *cmsg) {
         cmsg->cmsg_len   = CMSG_LEN(sizeof(cred));
         cmsg->cmsg_level = SOL_SOCKET;
         cmsg->cmsg_type  = SCM_CRED_TYPE;
-        // XXX this should not be needed
         v = Field(v, 0);
         cred.CRED_PID = Int_val(Field(v, 0));
         cred.CRED_UID = Int_val(Field(v, 1));
