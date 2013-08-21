@@ -15,7 +15,7 @@
 
 let verbose = ref false
 
-let dbg fmt =
+let _dbg fmt =
   let logger s = if !verbose then Printf.printf "%s\n%!" s
   in Printf.ksprintf logger fmt
 

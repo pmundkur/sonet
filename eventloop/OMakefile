@@ -12,15 +12,22 @@ O_FILES[] =
 	conn_map
 	unix_poller
 	epoll_poller
+	sendmsg
+	capsicum
 
 C_FILES[] =
+	posix_stubs
 	epoll_stubs
+	sendmsg_stubs
+	capsicum_stubs
 
 LIB = eventloop
 
-epoll_poller.$(CMO) epoll_poller.o : epoll_stubs.o
+epoll_poller.$(CMO) epoll_poller.o : posix_stubs.o epoll_stubs.o
+sendmsg.$(CMO) sendmsg.o : posix_stubs.o sendmsg_stubs.o
+capsicum.$(CMO) capsicum.o : posix_stubs.o capsicum_stubs.o
 
-epoll_stubs.o: epoll_stubs.c
+%.o: %.c
 	$(OCAMLC) -c -o $@ $^
 
 OCAML_LIB_FLAGS[] += $(absname $(addsuffix .o, $(C_FILES)))

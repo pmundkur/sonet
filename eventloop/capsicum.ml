@@ -117,5 +117,5 @@ external cap_enter : unit -> unit = "stub_cap_enter"
 external cap_rights_limit : Unix.file_descr -> cap_right list -> unit = "stub_cap_rights_limit"
 external cap_rights_get : Unix.file_descr -> cap_right list = "stub_cap_rights_get"
 
-let cap_fcntls_limit fd flist = ()
-let cap_fcntls_get fd = []
+let cap_fcntls_limit _fd _flist = ()
+let cap_fcntls_get _fd = []
