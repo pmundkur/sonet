@@ -48,7 +48,7 @@ CAMLprim value stub_cap_rights_limit(value fd, value rights) {
 }
 
 CAMLprim value stub_cap_rights_get(value fd) {
-    CAMLparam2(fd, rights);
+    CAMLparam1(fd);
     raise_unix_error(ENOTSUP, "cap_rights_get", "");
     CAMLreturn(Val_unit);
 }
