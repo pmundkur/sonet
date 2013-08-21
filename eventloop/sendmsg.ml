@@ -30,9 +30,13 @@ let getcred () =
    gid = Unix.getgid ()}
 
 external set_passcred_impl : Unix.file_descr -> bool -> unit = "stub_set_passcred"
+external set_recvcred_impl : Unix.file_descr -> bool -> unit = "stub_set_recvcred"
 
 let set_passcred fd bool =
   set_passcred_impl fd bool
+
+let set_recvcred fd bool =
+  set_recvcred_impl fd bool
 
 type proto_level = int
 type proto_type  = int

@@ -25,6 +25,27 @@
 #include <unistd.h>
 #include <string.h>
 
+#ifdef SCM_CREDS            /* BSD   */
+#include <sys/un.h>
+#define SCM_CRED_TYPE       SCM_CREDS
+#define CRED_PASS_SOCKOPT   LOCAL_CREDS
+#define CRED_RECV_SOCKOPT   LOCAL_PEERCRED
+#define CRED_STRUCT         cmsgcred
+#define CRED_PID            cmcred_pid
+#define CRED_UID            cmcred_uid
+#define CRED_GID            cmcred_gid
+#elif SCM_CREDENTIALS       /* Linux */
+#define SCM_CRED_TYPE       SCM_CREDENTIALS
+#define CRED_PASS_SOCKOPT   SO_PASSCRED
+#define CRED_RECV_SOCKOPT   SO_PEERCRED
+#define CRED_STRUCT         ucred
+#define CRED_PID            pid
+#define CRED_UID            uid
+#define CRED_GID            gid
+#else
+#error "Platform not supported for credential passing."
+#endif
+
 #include <caml/memory.h>
 #include <caml/alloc.h>
 #include <caml/custom.h>
@@ -75,16 +96,25 @@ static value make_flag_list(int f, int *flags, int n) {
 CAMLprim value stub_set_passcred(value fd, value flag) {
     CAMLparam2(fd, flag);
     int setting = Bool_val(flag);
-    int ret = setsockopt(Int_val(fd), SOL_SOCKET, SO_PASSCRED, &setting, sizeof(setting));
+    int ret = setsockopt(Int_val(fd), SOL_SOCKET, CRED_PASS_SOCKOPT, &setting, sizeof(setting));
     if (ret < 0)
         raise_unix_error(errno, "set_passcred", "");
+    CAMLreturn(Val_unit);
+}
+
+CAMLprim value stub_set_recvcred(value fd, value flag) {
+    CAMLparam2(fd, flag);
+    int setting = Bool_val(flag);
+    int ret = setsockopt(Int_val(fd), SOL_SOCKET, CRED_RECV_SOCKOPT, &setting, sizeof(setting));
+    if (ret < 0)
+        raise_unix_error(errno, "set_recvcred", "");
     CAMLreturn(Val_unit);
 }
 
 /* utility to compute amount of actual data in a cmsg. */
 static int cmsg_data_len(const struct msghdr *msg, const struct cmsghdr *cmsg) {
     size_t data_len;
-    char *msg_data_end = (char *)msg->msg_control + msg->msg_controllen;
+    char *msg_data_end  = (char *)msg->msg_control + msg->msg_controllen;
     char *cmsg_data_end = (char *)cmsg + cmsg->cmsg_len;
     if (cmsg->cmsg_len <= CMSG_LEN(0))
         return 0;
@@ -111,7 +141,7 @@ static size_t vcmsg_data_len(value v) {
     case Cmsg_scm_rights:
         return sizeof(int) * list_length(Field(v, 0));
     case Cmsg_scm_credentials:
-        return sizeof(struct ucred);
+        return sizeof(struct CRED_STRUCT);
     }
     return 0;
 }
@@ -119,7 +149,7 @@ static size_t vcmsg_data_len(value v) {
 /* NOTE: This assumes the containing control buffer has enough space
    allocated for the cmsg, e.g. using vcsmg_space(). */
 static void to_cmsg(value v, struct cmsghdr *cmsg) {
-    struct ucred cred;
+    struct CRED_STRUCT cred;
     int *fdp;
     switch (Tag_val(v)) {
     case Cmsg_generic:
@@ -143,11 +173,12 @@ static void to_cmsg(value v, struct cmsghdr *cmsg) {
     case Cmsg_scm_credentials:
         cmsg->cmsg_len   = CMSG_LEN(sizeof(cred));
         cmsg->cmsg_level = SOL_SOCKET;
-        cmsg->cmsg_type  = SCM_CREDENTIALS;
+        cmsg->cmsg_type  = SCM_CRED_TYPE;
+        // XXX this should not be needed
         v = Field(v, 0);
-        cred.pid = Int_val(Field(v, 0));
-        cred.uid = Int_val(Field(v, 1));
-        cred.gid = Int_val(Field(v, 2));
+        cred.CRED_PID = Int_val(Field(v, 0));
+        cred.CRED_UID = Int_val(Field(v, 1));
+        cred.CRED_GID = Int_val(Field(v, 2));
         memcpy(CMSG_DATA(cmsg), &cred, sizeof(cred));
         break;
     default:
@@ -188,6 +219,7 @@ CAMLprim value stub_sendmsg(value fd, value iovec_strings, value cmsgs, value se
         list = Field(list, 1);
     }
     if (msg.msg_controllen > 0) {
+        int cnt = 0;
         if ((msg.msg_control = (struct cmsghdr *) malloc(msg.msg_controllen)) == NULL)
             goto on_error;
         list = cmsgs;
@@ -196,11 +228,11 @@ CAMLprim value stub_sendmsg(value fd, value iovec_strings, value cmsgs, value se
             to_cmsg(Field(list, 0), cmsg);
             cmsg = CMSG_NXTHDR(&msg, cmsg);
             list = Field(list, 1);
+            cnt += 1;
         }
     }
     /* send flags */
     flags = caml_convert_flag_list(send_flags, send_flag_table);
-
     enter_blocking_section();
     ret = sendmsg(Int_val(fd), &msg, flags);
     leave_blocking_section();
@@ -218,7 +250,7 @@ static value of_cmsg(const struct msghdr *msg, const struct cmsghdr *cmsg) {
     CAMLparam0();
     CAMLlocal2(vret, v);
     if (cmsg->cmsg_level == SOL_SOCKET) {
-        struct ucred cred;
+        struct CRED_STRUCT cred;
         int *fdp, *fd_end;
         switch (cmsg->cmsg_type) {
         case SCM_RIGHTS:
@@ -236,12 +268,13 @@ static value of_cmsg(const struct msghdr *msg, const struct cmsghdr *cmsg) {
             vret = caml_alloc(1, Cmsg_scm_rights);
             Field(vret, 0) = v;
             CAMLreturn(vret);
-        case SCM_CREDENTIALS:
+
+        case SCM_CRED_TYPE:
             memcpy(&cred, CMSG_DATA(cmsg), sizeof(cred));
             v = caml_alloc(3, 0);
-            Field(v, 0) = Val_int(cred.pid);
-            Field(v, 1) = Val_int(cred.uid);
-            Field(v, 2) = Val_int(cred.gid);
+            Field(v, 0) = Val_int(cred.CRED_PID);
+            Field(v, 1) = Val_int(cred.CRED_UID);
+            Field(v, 2) = Val_int(cred.CRED_GID);
             vret = caml_alloc(1, Cmsg_scm_credentials);
             Field(vret, 0) = v;
             CAMLreturn(vret);
