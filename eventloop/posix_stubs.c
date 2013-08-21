@@ -72,3 +72,21 @@ void raise_unix_error(int errnum, char *fn_name, char *fn_param) {
 
     CAMLreturn0;
 }
+
+value make_flag_list(int f, int *flags, int n) {
+    CAMLparam0();
+    CAMLlocal2(vlist, v);
+    int i;
+
+    vlist = Val_int(0);
+    for (i = 0; f && i < n; i++) {
+        if (f & flags[i]) {
+            v = caml_alloc(2, 0);
+            Field(v, 0) = Val_int(i);
+            Field(v, 1) = vlist;
+            vlist = v;
+            f &= ~flags[i];
+        }
+    }
+    CAMLreturn(vlist);
+}

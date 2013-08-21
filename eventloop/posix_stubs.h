@@ -15,3 +15,6 @@
 
 /* Convert errno's into exceptions from the unix module. */
 void raise_unix_error(int errnum, char *fn_name, char *fn_param);
+
+/* Convert a bitmap of flags into a list of values. */
+value make_flag_list(int f, int *flags, int n);

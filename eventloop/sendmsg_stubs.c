@@ -72,23 +72,6 @@ static int list_length (value list) {
     }
     return len;
 }
-static value make_flag_list(int f, int *flags, int n) {
-    CAMLparam0();
-    CAMLlocal2(vlist, v);
-    int i;
-
-    vlist = Val_int(0);
-    for (i = 0; f && i < n; i++) {
-        if (f & flags[i]) {
-            v = caml_alloc(2, 0);
-            Field(v, 0) = Val_int(i);
-            Field(v, 1) = vlist;
-            vlist = v;
-            f &= ~flags[i];
-        }
-    }
-    CAMLreturn(vlist);
-}
 
 /* socket option for receiving credentials */
 CAMLprim value stub_set_recvcred(value fd, value flag) {
