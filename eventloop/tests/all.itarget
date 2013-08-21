@@ -1,2 +1,4 @@
 test_sendmsg.byte
 test_sendmsg.native
+test_capsicum.byte
+test_capsicum.native

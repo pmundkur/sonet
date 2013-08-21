@@ -1,3 +1,4 @@
 epoll_stubs.o
 posix_stubs.o
 sendmsg_stubs.o
+capsicum_stubs.o

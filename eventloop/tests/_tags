@@ -1,1 +1,2 @@
 <test_sendmsg.{byte,native}>: use_unix, use_eventloop
+<test_capsicum.{byte,native}>: use_unix, use_eventloop
