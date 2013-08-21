@@ -79,13 +79,12 @@ value make_flag_list(int f, int *flags, int n) {
     int i;
 
     vlist = Val_int(0);
-    for (i = 0; f && i < n; i++) {
-        if (f & flags[i]) {
+    for (i = 0; i < n; i++) {
+        if ((f & flags[i]) == flags[i]) {
             v = caml_alloc(2, 0);
             Field(v, 0) = Val_int(i);
             Field(v, 1) = vlist;
             vlist = v;
-            f &= ~flags[i];
         }
     }
     CAMLreturn(vlist);
