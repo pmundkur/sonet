@@ -13,5 +13,5 @@ let run_tests () =
 
 let () =
   try run_tests ()
-  with Unix.Unix_error (ec, fn, em) ->
+  with Unix.Unix_error (ec, fn, _em) ->
     Printf.eprintf "unix error: %s: %s\n" fn (Unix.error_message ec)

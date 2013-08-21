@@ -1,0 +1,18 @@
+OCAMLINCLUDES[] += $(EVENTLOOP_DIR)
+
+OCAML_LIBS[] += $(EVENTLOOP_DIR)/eventloop
+
+OCAML_OTHER_LIBS[] +=
+	unix
+
+TEST_SENDMSG_PROG = test_sendmsg
+TEST_SENDMSG = $(OCamlProgram $(TEST_SENDMSG_PROG), test_sendmsg)
+
+TEST_CAPSICUM_PROG = test_capsicum
+TEST_CAPSICUM = $(OCamlProgram $(TEST_CAPSICUM_PROG), test_capsicum)
+
+.DEFAULT: $(TEST_SENDMSG) $(TEST_CAPSICUM)
+
+.PHONY: clean
+clean:
+	$(CLEAN) $(TEST_SENDMSG) $(TEST_CAPSICUM)

@@ -38,3 +38,5 @@ EVENTLOOP_LIB = $(OCamlLibrary $(LIB), $(O_FILES))
 
 clean:
 	$(CLEAN)
+
+.SUBDIRS: tests
