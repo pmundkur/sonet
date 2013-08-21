@@ -28,9 +28,21 @@
 
 #include "posix_stubs.h"
 
+#ifndef __FreeBSD__
+
+CAMLprim value stub_cap_sandboxed(value unit) {
+    CAMLparam1(unit);
+    raise_unix_error(ENOTSUP, "cap_sandboxed", "");
+    CAMLreturn(Val_unit);
+}
+
+#else
+
 CAMLprim value stub_cap_sandboxed(value unit) {
     CAMLparam1(unit);
     CAMLlocal1(ret);
     ret = cap_sandboxed() ? Val_true : Val_false;
     CAMLreturn(ret);
 }
+
+#endif
