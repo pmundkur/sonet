@@ -28,14 +28,14 @@
 #ifdef SCM_CREDS                            /* BSD   */
 #include <sys/un.h>
 #define SCM_CRED_TYPE       SCM_CREDS
-#define CRED_PASS_SOCKOPT   LOCAL_PEERCRED
+#define CRED_RECV_SOCKOPT   LOCAL_PEERCRED
 #define CRED_STRUCT         cmsgcred
 #define CRED_PID            cmcred_pid
 #define CRED_UID            cmcred_uid
 #define CRED_GID            cmcred_gid
 #elif defined(SCM_CREDENTIALS)              /* Linux */
 #define SCM_CRED_TYPE       SCM_CREDENTIALS
-#define CRED_PASS_SOCKOPT   SO_PASSCRED
+#define CRED_RECV_SOCKOPT   SO_PASSCRED
 #define CRED_STRUCT         ucred
 #define CRED_PID            pid
 #define CRED_UID            uid
@@ -90,13 +90,13 @@ static value make_flag_list(int f, int *flags, int n) {
     CAMLreturn(vlist);
 }
 
-/* socket option for credentials */
-CAMLprim value stub_set_passcred(value fd, value flag) {
+/* socket option for receiving credentials */
+CAMLprim value stub_set_recvcred(value fd, value flag) {
     CAMLparam2(fd, flag);
     int setting = Bool_val(flag);
-    int ret = setsockopt(Int_val(fd), SOL_SOCKET, CRED_PASS_SOCKOPT, &setting, sizeof(setting));
+    int ret = setsockopt(Int_val(fd), SOL_SOCKET, CRED_RECV_SOCKOPT, &setting, sizeof(setting));
     if (ret < 0)
-        raise_unix_error(errno, "set_passcred", "");
+        raise_unix_error(errno, "set_recvcred", "");
     CAMLreturn(Val_unit);
 }
 
