@@ -28,7 +28,6 @@ type cred = {
 
 val getcred : unit -> cred      (* credentials of caller *)
 val set_passcred : Unix.file_descr -> bool -> unit
-val set_recvcred : Unix.file_descr -> bool -> unit
 
 (* Control messages that can be sent and received via sendmsg(). *)
 

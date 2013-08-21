@@ -28,8 +28,7 @@
 #ifdef SCM_CREDS                            /* BSD   */
 #include <sys/un.h>
 #define SCM_CRED_TYPE       SCM_CREDS
-#define CRED_PASS_SOCKOPT   LOCAL_CREDS
-#define CRED_RECV_SOCKOPT   LOCAL_PEERCRED
+#define CRED_PASS_SOCKOPT   LOCAL_PEERCRED
 #define CRED_STRUCT         cmsgcred
 #define CRED_PID            cmcred_pid
 #define CRED_UID            cmcred_uid
@@ -37,7 +36,6 @@
 #elif defined(SCM_CREDENTIALS)              /* Linux */
 #define SCM_CRED_TYPE       SCM_CREDENTIALS
 #define CRED_PASS_SOCKOPT   SO_PASSCRED
-#define CRED_RECV_SOCKOPT   SO_PEERCRED
 #define CRED_STRUCT         ucred
 #define CRED_PID            pid
 #define CRED_UID            uid
@@ -99,15 +97,6 @@ CAMLprim value stub_set_passcred(value fd, value flag) {
     int ret = setsockopt(Int_val(fd), SOL_SOCKET, CRED_PASS_SOCKOPT, &setting, sizeof(setting));
     if (ret < 0)
         raise_unix_error(errno, "set_passcred", "");
-    CAMLreturn(Val_unit);
-}
-
-CAMLprim value stub_set_recvcred(value fd, value flag) {
-    CAMLparam2(fd, flag);
-    int setting = Bool_val(flag);
-    int ret = setsockopt(Int_val(fd), SOL_SOCKET, CRED_RECV_SOCKOPT, &setting, sizeof(setting));
-    if (ret < 0)
-        raise_unix_error(errno, "set_recvcred", "");
     CAMLreturn(Val_unit);
 }
 

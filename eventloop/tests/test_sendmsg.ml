@@ -35,7 +35,6 @@ let make_socks () =
 let test_sendrecv () =
   let sndr, rcvr = make_socks () in
   let smsg = make_msg () in
-  set_passcred sndr true;
   set_passcred rcvr true;
   Printf.printf "test_send: %d\n%!" (Sendmsg.sendmsg sndr smsg sflags);
   show_msg (Sendmsg.recvmsg rcvr [])
