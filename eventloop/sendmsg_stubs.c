@@ -25,7 +25,7 @@
 #include <unistd.h>
 #include <string.h>
 
-#ifdef SCM_CREDS            /* BSD   */
+#ifdef SCM_CREDS                            /* BSD   */
 #include <sys/un.h>
 #define SCM_CRED_TYPE       SCM_CREDS
 #define CRED_PASS_SOCKOPT   LOCAL_CREDS
@@ -34,7 +34,7 @@
 #define CRED_PID            cmcred_pid
 #define CRED_UID            cmcred_uid
 #define CRED_GID            cmcred_gid
-#elif SCM_CREDENTIALS       /* Linux */
+#elif defined(SCM_CREDENTIALS)              /* Linux */
 #define SCM_CRED_TYPE       SCM_CREDENTIALS
 #define CRED_PASS_SOCKOPT   SO_PASSCRED
 #define CRED_RECV_SOCKOPT   SO_PEERCRED
