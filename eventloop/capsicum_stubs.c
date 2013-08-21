@@ -18,8 +18,7 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include <sys/capability.h>
-#include <stdbool.h>
+#include <errno.h>
 
 #include <caml/memory.h>
 #include <caml/alloc.h>
@@ -37,6 +36,9 @@ CAMLprim value stub_cap_sandboxed(value unit) {
 }
 
 #else
+
+#include <sys/capability.h>
+#include <stdbool.h>
 
 CAMLprim value stub_cap_sandboxed(value unit) {
     CAMLparam1(unit);
