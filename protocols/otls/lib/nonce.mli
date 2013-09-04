@@ -1,0 +1,2 @@
+
+val mkHelloRandom : unit -> string

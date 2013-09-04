@@ -1,0 +1,1 @@
+val random: int -> string

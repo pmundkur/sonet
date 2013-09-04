@@ -1,5 +1,6 @@
 eventloop/all.otarget
 eventloop/tests/all.otarget
+protocols/otls/all.otarget
 protocols/http/all.otarget
 protocols/http/tests/all.otarget
 protocols/jsonrpc/all.otarget
