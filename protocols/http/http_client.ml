@@ -199,7 +199,7 @@ module Make (Id : RequestId) = struct
          one alternative, it would be nicer to use a timer. *)
       close_conn false cba t;
       restart_after_error t (Http (status, "Server busy")) cba restarter
-    end else if status = 300 or status = 301 or status = 302 then begin
+    end else if status = 300 || status = 301 || status = 302 then begin
       (* Perform redirection.  303 is not currently handled, and will
          be treated like an error. *)
       let headers = H.Response.headers resp in
