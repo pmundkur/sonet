@@ -23,5 +23,5 @@ let string_as_list s =
 
 let string_to_hex s =
   let clist = string_as_list s in
-  let hexlist = List.map (fun c ->  Printf.sprintf "%0X" (Char.code c)) clist
+  let hexlist = List.map (fun c ->  Printf.sprintf "%02X" (Char.code c)) clist
   in String.concat "" hexlist
