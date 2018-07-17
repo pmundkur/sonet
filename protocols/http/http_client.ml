@@ -287,7 +287,7 @@ module Make (Id : RequestId) = struct
     C.StreamingRecv ((req_of (reqhdr_of meth url []) None), prcb)
 
   let make_file_send_request meth url fd cba t =
-    let pscb = file_sender fd (String.create 8048) cba t in
+    let pscb = file_sender fd (Bytes.create 8048) cba t in
     let cl_hdr = content_length_hdr_of_fd fd in
     C.StreamingSend ((reqhdr_of meth url cl_hdr), pscb)
 

@@ -48,7 +48,7 @@ let parse_args () =
 
 let read_whole_file input_file =
   let st = Unix.stat input_file in
-  let buf = String.create st.Unix.st_size in
+  let buf = Bytes.create st.Unix.st_size in
   let fd = Unix.openfile input_file [ Unix.O_RDONLY ] 0 in
   let rec do_read start len =
     if len = 0 then ()

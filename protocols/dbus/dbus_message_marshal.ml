@@ -95,7 +95,7 @@ let get_endian_code = function
   | T.Big_endian          -> Dbus_protocol.big_endian
 
 let marshal_message endian buffer ~offset ~length m =
-  buffer.[offset] <- get_endian_code endian;
+  Bytes.set buffer offset (get_endian_code endian);
   let start_offset = offset in
   let offset, length = offset + 1, length - 1 in
   let ctxt = P.init_context endian buffer ~start_offset ~offset ~length in

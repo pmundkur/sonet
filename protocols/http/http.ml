@@ -25,8 +25,8 @@ let is_space c = c = ' ' || c = '\t' || c = '\r' || c = '\n'
 
 let rev_string_of_chars cl =
   let len = List.length cl in
-  let s = String.create len in
-    ignore (List.fold_left (fun idx c -> s.[idx] <- c; idx - 1) (len - 1) cl);
+  let s = Bytes.create len in
+    ignore (List.fold_left (fun idx c -> Bytes.set s idx c; idx - 1) (len - 1) cl);
     s
 
 let is_ctl_char c =
@@ -70,7 +70,7 @@ let rec strip_leading_spaces = function
 type header_fields = (string * string list) list
 
 let rec add_header fname fvalue =
-  let fname = String.lowercase fname in
+  let fname = String.lowercase_ascii fname in
   let rec adder = function
     | [] -> [ fname, [fvalue] ]
     | (n, vl) :: hdrs when n = fname -> (n, fvalue :: vl) :: hdrs
@@ -78,7 +78,7 @@ let rec add_header fname fvalue =
   in adder
 
 let lookup_header name hdrs =
-  List.assoc (String.lowercase name) hdrs
+  List.assoc (String.lowercase_ascii name) hdrs
 
 let is_header_present hdr headers =
   try ignore (lookup_header hdr headers); true
@@ -874,7 +874,7 @@ module Payload = struct
         | v :: _ ->
             let identity = "identity" in
             let vl, il = String.length v, String.length identity in
-              vl < il || String.lowercase (String.sub v 0 il) <> identity
+              vl < il || String.lowercase_ascii (String.sub v 0 il) <> identity
         | [] -> (* should never happen *) false
     with Not_found -> false
 
@@ -891,7 +891,7 @@ module Payload = struct
         | v :: _ ->
             let multipart = "multipart/byteranges" in
             let vl, ml = String.length v, String.length multipart in
-              vl >= ml && String.lowercase (String.sub v 0 ml) = multipart
+              vl >= ml && String.lowercase_ascii (String.sub v 0 ml) = multipart
         | [] -> (* should never happen *) false
     with Not_found -> false
 

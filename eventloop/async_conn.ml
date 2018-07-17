@@ -53,7 +53,7 @@ let connect_callback _el h =
 let recv_ready_callback _el h fd =
   let conn = Conns.get_conn h in
   let buflen = 512 in
-  let buf = String.create buflen in
+  let buf = Bytes.create buflen in
     try
       let read_bytes = Unix.read fd buf 0 buflen in
         if read_bytes = 0 then

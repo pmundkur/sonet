@@ -144,7 +144,7 @@ let check_and_align_context ctxt ~align ~size dtype =
 let put_byte ?(dtype=T.T_base T.B_byte) ctxt b =
   let align = T.alignment_of (T.T_base T.B_byte) in
   let ctxt = check_and_align_context ctxt ~align ~size:1 dtype in
-    ctxt.buffer.[ctxt.current_offset] <- b;
+    Bytes.set ctxt.buffer ctxt.current_offset b;
     advance ctxt 1
 
 let marshal_byte ctxt v =
@@ -155,8 +155,8 @@ let marshal_byte ctxt v =
 let put_u16 ?(dtype=T.T_base T.B_uint16) ctxt (b0, b1) =
   let align = T.alignment_of dtype in
   let ctxt = check_and_align_context ctxt ~align ~size:2 dtype in
-    ctxt.buffer.[ctxt.current_offset] <- b0;
-    ctxt.buffer.[ctxt.current_offset + 1] <- b1;
+    Bytes.set ctxt.buffer ctxt.current_offset b0;
+    Bytes.set ctxt.buffer (ctxt.current_offset + 1) b1;
     advance ctxt 2
 
 let from_uint16 endian i =
@@ -185,10 +185,10 @@ let marshal_uint16 ctxt v =
 let put_u32 ?(dtype=T.T_base T.B_uint32) ctxt (b0, b1, b2, b3) =
   let align = T.alignment_of dtype in
   let ctxt = check_and_align_context ctxt ~align ~size:4 dtype in
-    ctxt.buffer.[ctxt.current_offset] <- b0;
-    ctxt.buffer.[ctxt.current_offset + 1] <- b1;
-    ctxt.buffer.[ctxt.current_offset + 2] <- b2;
-    ctxt.buffer.[ctxt.current_offset + 3] <- b3;
+    Bytes.set ctxt.buffer ctxt.current_offset b0;
+    Bytes.set ctxt.buffer (ctxt.current_offset + 1) b1;
+    Bytes.set ctxt.buffer (ctxt.current_offset + 2) b2;
+    Bytes.set ctxt.buffer (ctxt.current_offset + 3) b3;
     advance ctxt 4
 
 let byte_at_32 i ofs =
@@ -231,14 +231,14 @@ let marshal_boolean ctxt v =
 let put_u64 ?(dtype=T.T_base T.B_uint64) ctxt (b0, b1, b2, b3, b4, b5, b6, b7) =
   let align = T.alignment_of dtype in
   let ctxt = check_and_align_context ctxt ~align ~size:8 dtype in
-    ctxt.buffer.[ctxt.current_offset] <- b0;
-    ctxt.buffer.[ctxt.current_offset + 1] <- b1;
-    ctxt.buffer.[ctxt.current_offset + 2] <- b2;
-    ctxt.buffer.[ctxt.current_offset + 3] <- b3;
-    ctxt.buffer.[ctxt.current_offset + 4] <- b4;
-    ctxt.buffer.[ctxt.current_offset + 5] <- b5;
-    ctxt.buffer.[ctxt.current_offset + 6] <- b6;
-    ctxt.buffer.[ctxt.current_offset + 7] <- b7;
+    Bytes.set ctxt.buffer ctxt.current_offset b0;
+    Bytes.set ctxt.buffer (ctxt.current_offset + 1) b1;
+    Bytes.set ctxt.buffer (ctxt.current_offset + 2) b2;
+    Bytes.set ctxt.buffer (ctxt.current_offset + 3) b3;
+    Bytes.set ctxt.buffer (ctxt.current_offset + 4) b4;
+    Bytes.set ctxt.buffer (ctxt.current_offset + 5) b5;
+    Bytes.set ctxt.buffer (ctxt.current_offset + 6) b6;
+    Bytes.set ctxt.buffer (ctxt.current_offset + 7) b7;
     advance ctxt 8
 
 let from_int64 endian i =
@@ -272,23 +272,23 @@ let marshal_double ctxt v =
     (match Dbus_platform.get_host_endianness (), ctxt.endian with
        | Dbus_platform.Little_endian, T.Little_endian
        | Dbus_platform.Big_endian, T.Big_endian ->
-           ctxt.buffer.[ctxt.current_offset] <- db.(0);
-           ctxt.buffer.[ctxt.current_offset + 1] <- db.(1);
-           ctxt.buffer.[ctxt.current_offset + 2] <- db.(2);
-           ctxt.buffer.[ctxt.current_offset + 3] <- db.(3);
-           ctxt.buffer.[ctxt.current_offset + 4] <- db.(4);
-           ctxt.buffer.[ctxt.current_offset + 5] <- db.(5);
-           ctxt.buffer.[ctxt.current_offset + 6] <- db.(6);
-           ctxt.buffer.[ctxt.current_offset + 7] <- db.(7)
+           Bytes.set ctxt.buffer ctxt.current_offset       db.(0);
+           Bytes.set ctxt.buffer (ctxt.current_offset + 1) db.(1);
+           Bytes.set ctxt.buffer (ctxt.current_offset + 2) db.(2);
+           Bytes.set ctxt.buffer (ctxt.current_offset + 3) db.(3);
+           Bytes.set ctxt.buffer (ctxt.current_offset + 4) db.(4);
+           Bytes.set ctxt.buffer (ctxt.current_offset + 5) db.(5);
+           Bytes.set ctxt.buffer (ctxt.current_offset + 6) db.(6);
+           Bytes.set ctxt.buffer (ctxt.current_offset + 7) db.(7)
        | _ ->
-           ctxt.buffer.[ctxt.current_offset] <- db.(7);
-           ctxt.buffer.[ctxt.current_offset + 1] <- db.(6);
-           ctxt.buffer.[ctxt.current_offset + 2] <- db.(5);
-           ctxt.buffer.[ctxt.current_offset + 3] <- db.(4);
-           ctxt.buffer.[ctxt.current_offset + 4] <- db.(3);
-           ctxt.buffer.[ctxt.current_offset + 5] <- db.(2);
-           ctxt.buffer.[ctxt.current_offset + 6] <- db.(1);
-           ctxt.buffer.[ctxt.current_offset + 7] <- db.(0)
+           Bytes.set ctxt.buffer (ctxt.current_offset)     db.(7);
+           Bytes.set ctxt.buffer (ctxt.current_offset + 1) db.(6);
+           Bytes.set ctxt.buffer (ctxt.current_offset + 2) db.(5);
+           Bytes.set ctxt.buffer (ctxt.current_offset + 3) db.(4);
+           Bytes.set ctxt.buffer (ctxt.current_offset + 4) db.(3);
+           Bytes.set ctxt.buffer (ctxt.current_offset + 5) db.(2);
+           Bytes.set ctxt.buffer (ctxt.current_offset + 6) db.(1);
+           Bytes.set ctxt.buffer (ctxt.current_offset + 7) db.(0)
     );
     advance ctxt 8
 

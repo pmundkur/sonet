@@ -60,12 +60,12 @@ let explode s =
 
 let implode cl =
   let len = List.length cl in
-  let s = String.create len in
-    ignore (List.fold_left (fun idx c -> s.[idx] <- c; idx + 1) 0 cl);
+  let s = Bytes.create len in
+    ignore (List.fold_left (fun idx c -> Bytes.set s idx c; idx + 1) 0 cl);
     s
 
 let lowercase s =
-  implode (List.map Char.lowercase (explode s))
+  implode (List.map Char.lowercase_ascii (explode s))
 
 let maybe f x = match x with None -> None | Some x -> Some (f x)
 
@@ -98,7 +98,7 @@ let pct_decode s =
                characters.
             *)
             if is_unreserved chr then decode rest (chr :: acc)
-            else decode rest (Char.uppercase l :: Char.uppercase h :: '%' :: acc)
+            else decode rest (Char.uppercase_ascii l :: Char.uppercase_ascii h :: '%' :: acc)
       | c :: rest ->
           decode rest (c :: acc)
       | [] ->

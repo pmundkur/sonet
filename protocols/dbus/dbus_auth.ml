@@ -232,8 +232,8 @@ let init_client_context mech_type sender =
 
 let rev_string_of_chars cl =
   let len = List.length cl in
-  let s = String.create len in
-    ignore (List.fold_left (fun idx c -> s.[idx] <- c; idx - 1) (len - 1) cl);
+  let s = Bytes.create len in
+    ignore (List.fold_left (fun idx c -> Bytes.set s idx c; idx - 1) (len - 1) cl);
     s
 
 let parse_char ctxt c =

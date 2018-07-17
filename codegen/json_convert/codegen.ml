@@ -171,8 +171,8 @@ module Pragma = struct
 
   let clist_to_str clist =
     let len = List.length clist in
-    let s = String.create len in
-      ignore (List.fold_left (fun pos c -> s.[pos] <- c; (pos - 1))
+    let s = Bytes.create len in
+      ignore (List.fold_left (fun pos c -> Bytes.set s pos c; (pos - 1))
                 (len-1) clist);
       s
 
@@ -471,7 +471,7 @@ let generate_header ff ifn =
   let argv = (Filename.basename (List.hd argv)) :: (List.tl argv) in
   let call = String.concat " " argv in
     fprintf ff "(* This file has been auto-generated using \"%s\". *)@\n@\n" call;
-    fprintf ff "open Json_conv\nopen %s@\n@\n" (String.capitalize md)
+    fprintf ff "open Json_conv\nopen %s@\n@\n" (String.capitalize_ascii md)
 
 let generate_one_defn ff td =
   match td with
